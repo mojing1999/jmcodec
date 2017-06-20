@@ -180,7 +180,7 @@ int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx)
 	if (0 == pbs->DataLength)
 		pbs->DataOffset = 0;
 
-	if((pbs->DataOffset > 0) && (pbs->DataLength > 0) && (pbs->DataOffset >= pbs->DataLength)) {
+	if((pbs->DataOffset > 0) && (pbs->DataLength > 0)) {
 		memmove(pbs->Data, pbs->Data + pbs->DataOffset, pbs->DataLength);
 		pbs->DataOffset = 0;
 	}
@@ -272,6 +272,11 @@ int intel_dec_set_eof(int is_eof, intel_ctx *ctx)
 
 	LOG("\nintel decode set eof...\n");
 	return 0;
+}
+
+bool intel_dec_is_exit(intel_ctx *ctx)
+{
+	return ctx->is_exit;
 }
 
 /*
@@ -460,6 +465,14 @@ int dec_extend_bitstream(int new_size, mfxBitstream *pbs)
 int dec_get_input_data_len(intel_ctx *ctx)
 {
 	return ctx->in_bs->DataLength;
+}
+
+int intel_dec_set_yuv_callback(void *user_data, YUV_CALLBACK fn, intel_ctx *ctx)
+{
+	ctx->user_data = user_data;
+	ctx->yuv_callback = fn;
+
+	return 0;
 }
 
 int dec_init_yuv_output(intel_ctx *ctx)
@@ -675,8 +688,15 @@ int dec_conver_surface_to_bistream(mfxFrameSurface1 *surface, intel_ctx *ctx)
 		break;
 	}
 
-	// push to queue
-	dec_push_yuv_frame(frame_bs, ctx);
+	if (ctx->yuv_callback) {
+		ctx->yuv_callback(frame_bs->Data, frame_bs->DataLength, ctx->user_data);
+		dec_release_bitstream(frame_bs);
+	}
+	else {
+		// push to queue
+		dec_push_yuv_frame(frame_bs, ctx);
+
+	}
 
 	return 0;
 }
@@ -938,3 +958,12 @@ JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle)
 	return intel_dec_get_input_free_buf_len((intel_ctx *)handle);
 }
 
+JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBACK callback, handle_inteldec handle)
+{
+	return intel_dec_set_yuv_callback(user_data, (YUV_CALLBACK)callback, (intel_ctx *)handle);
+}
+
+JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle)
+{
+	return intel_dec_is_exit((intel_ctx *)handle);
+}

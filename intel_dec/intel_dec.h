@@ -27,6 +27,7 @@
 
 
 
+typedef int (*YUV_CALLBACK)(unsigned char *out_buf, int out_len, void *user_data);
 
 enum  
 {
@@ -75,6 +76,9 @@ typedef struct _intel_ctx
 
 	int		is_exit;
 
+	void	*user_data;
+	YUV_CALLBACK yuv_callback;
+
 }intel_ctx;
 
 // 
@@ -87,9 +91,13 @@ int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx);
 int intel_dec_output_yuv_frame(uint8_t *out_buf, int *out_len, intel_ctx *ctx);
 
 //
+bool intel_dec_is_exit(intel_ctx *ctx);
 bool intel_dec_need_more_data(intel_ctx *ctx);
 int intel_dec_get_input_free_buf_len(intel_ctx *ctx);
 int intel_dec_set_eof(int is_eof, intel_ctx *ctx);
+
+int intel_dec_set_yuv_callback(void *user_data, YUV_CALLBACK fn, intel_ctx *ctx);
+
 int dec_get_input_data_len(intel_ctx *ctx);
 
 // init 

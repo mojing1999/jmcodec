@@ -16,6 +16,14 @@
 
 #pragma comment(lib,"intel_dec.lib")
 
+int save_yuv_frame(unsigned char *out_buf, int out_len, void *user_data)
+{
+	FILE *ofile = (FILE*)user_data;
+	//fwrite(out_buf, 1, out_len, ofile);
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	handle_inteldec dec_handle;
@@ -42,13 +50,15 @@ int main(int argc, char **argv)
 
 	jm_intel_dec_init(0, 0, dec_handle);
 
+	jm_intel_dec_set_yuv_callback(ofile, save_yuv_frame, dec_handle);
+
 	int ret = 0;
 	int read_len = 0, write_len = 0;
 	int remaining_len = 0;
 	int yuv_len = 0;
 	int is_eof = 0;
 
-	while (1) {
+	while (!jm_intel_dec_is_exit(dec_handle)) {
 		if (jm_intel_dec_need_more_data(dec_handle) && 0 == is_eof) {
 			remaining_len = jm_intel_dec_free_buf_len(dec_handle);
 			read_len = fread(in_buf, 1, remaining_len, ifile);
@@ -62,6 +72,7 @@ int main(int argc, char **argv)
 			}
 		}
 
+#if 0
 		ret = jm_intel_dec_output_frame(out_buf, &yuv_len, dec_handle);
 		if (0 == ret/* && yuv_len > 0*/) {
 			//write_len = fwrite(out_buf, 1, yuv_len, ofile);
@@ -71,6 +82,7 @@ int main(int argc, char **argv)
 			if (-2 == ret)
 				break;
 		}
+#endif
 
 
 	}

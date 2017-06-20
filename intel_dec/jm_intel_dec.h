@@ -18,6 +18,8 @@
 
 
 typedef void * handle_inteldec;
+typedef int (*HANDLE_YUV_CALLBACK)(unsigned char *out_buf, int out_len, void *user_data);
+
 
 /** 
  *  @desc:   create decode handle
@@ -85,5 +87,9 @@ JMDLL_FUNC int jm_intel_dec_stream_info(int *in_data_len, handle_inteldec handle
 JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle);
 
 JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle);
+
+JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBACK callback, handle_inteldec handle);
+
+JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle);
 
 #endif	//_JM_INTEL_DECODER_H_
