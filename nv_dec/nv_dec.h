@@ -24,9 +24,9 @@
 
 
 #ifdef _DEBUG
-    #define LOG( ... )				printf( __VA_ARGS__ );
+    #define LOG( ... )				printf( __VA_ARGS__ )
 #else
-    #define LOG( ... )              printf( __VA_ARGS__ );
+    #define LOG( ... )              
 #endif
 
 #define NVDEC_MAX_FRAMES 3
