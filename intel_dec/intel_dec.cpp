@@ -11,15 +11,18 @@
 #include "intel_dec.h"
 #include "jm_intel_dec.h"
 
+#include <time.h>
 
-#pragma comment(lib,"legacy_stdio_definitions.lib")
+
 #pragma comment(lib,"libmfx.lib")
+#pragma comment(lib,"legacy_stdio_definitions.lib")
 
 #define MSDK_SLEEP(X)                   { Sleep(X); }
 #define MAX_INPUT_BITSTREAM_SIZE		(5*1024*1024)
-#define MAX_OUTPUT_YUV_COUNT			100	
+#define MAX_OUTPUT_YUV_COUNT			20	
 #define MUTEXT_NAME_YUV					("intel_output_yuv")
 #define MUTEXT_NAME_INPUT				("intel_input_bs")
+#define EVENT_NAME_YUV					("intel_yuv_evt")
 #define SYNC_WAITING_TIME				(60000)        	
 #define INTEL_DEC_ASYNC_DEPTH			4	
 #define MSDK_ALIGN32(X)                 (((mfxU32)((X)+31)) & (~ (mfxU32)31))
@@ -52,8 +55,9 @@ DWORD WINAPI decode_thread_proc(LPVOID param)
 	// output decoder cached frame
 	dec_handle_cached_frame(ctx);
 
+	intel_dec_show_info(ctx);
 
-	ctx->is_exit = 1;
+	ctx->is_exit = true;
 	return 0;
 }
 
@@ -245,12 +249,7 @@ int intel_dec_output_yuv_frame(uint8_t *out_buf, int *out_len, intel_ctx *ctx)
 
 	mfxBitstream *bs = dec_pop_yuv_frame(ctx);
 	if (NULL == bs) {
-		if (ctx->is_exit) {
-			return -2;
-		}
-		else {
-			return -1;
-		}
+		return -1;
 	}
 
 
@@ -261,6 +260,12 @@ int intel_dec_output_yuv_frame(uint8_t *out_buf, int *out_len, intel_ctx *ctx)
 
 	// release bitstream
 	dec_release_bitstream(bs);
+
+	// event
+	if (ctx->is_waiting) {
+		//LOG("--- Before SetEvent()\n");
+		SetEvent(ctx->event_yuv);
+	}
 
 	return 0;
 }
@@ -413,6 +418,34 @@ uint32_t dec_get_codec_id_by_type(int codec_type, intel_ctx *ctx)
 	return codec_id;
 }
 
+char *dec_get_codec_id_string(intel_ctx *ctx)
+{
+	switch (ctx->param->mfx.CodecId)
+	{
+	case MFX_CODEC_AVC:
+		return "H.264";
+
+	case MFX_CODEC_HEVC:
+		return "H.265";
+
+	case MFX_CODEC_MPEG2:
+		return "MPEG2";
+
+	case MFX_CODEC_VC1:
+		return "VC1";
+
+	case MFX_CODEC_CAPTURE:
+		return "CAPTURE";
+
+	case MFX_CODEC_VP9:
+		return "VP9";
+
+	default:
+		return "UNKNOW";
+	}
+	return "UNKNOW";
+}
+
 /*	
  *	bitstream function
  */
@@ -462,6 +495,32 @@ int dec_extend_bitstream(int new_size, mfxBitstream *pbs)
 	return new_size;
 }
 
+int intel_dec_show_info(intel_ctx *ctx)
+{
+	uint32_t cur_time;
+	cur_time = clock();
+	ctx->elapsed_time = clock() - ctx->elapsed_time;
+	sprintf_s(ctx->dec_info, MAX_LEN_DEC_INFO,
+		"==========================================\n"
+		"Codec:\t\t%s\n"
+		"Display:\t%d x %d\n"
+		"Pixel Format:\t%s\n"
+		"Frame Count:\t%d\n"
+		"Elapsed Time:\t%d ms\n"
+		"Decode FPS:\t%f fps\n"
+		"==========================================\n",
+		dec_get_codec_id_string(ctx),
+		ctx->param->mfx.FrameInfo.Width, ctx->param->mfx.FrameInfo.Height,
+		ctx->out_fmt == 0 ? "NV12" : "YV12",
+		ctx->num_yuv_frames,
+		ctx->elapsed_time,
+		(double)ctx->num_yuv_frames * CLOCKS_PER_SEC / (double)ctx->elapsed_time);
+
+	//LOG(ctx->dec_info);
+	return 0;
+}
+
+
 int dec_get_input_data_len(intel_ctx *ctx)
 {
 	return ctx->in_bs->DataLength;
@@ -493,6 +552,9 @@ int dec_init_yuv_output(intel_ctx *ctx)
 
 	// init mutex
 	ctx->mutex_yuv = CreateMutexA(NULL, FALSE, MUTEXT_NAME_YUV);
+
+	// init event
+	ctx->event_yuv = CreateEventA(NULL, TRUE, FALSE, EVENT_NAME_YUV);
 
 	LOG("intel decode init yuv output, yuv frame count = %d\n", ctx->num_yuv);
 	return 0;
@@ -617,9 +679,18 @@ int dec_conver_surface_to_bistream(mfxFrameSurface1 *surface, intel_ctx *ctx)
 	frame_bs = dec_get_free_yuv_bitstream(ctx);
 
 	if (NULL == frame_bs) {
-		// lost frame
-		LOG("Error: can not get free yuv frame bitstream.\n");
-		return -1;
+		// waiting for output yuv release yuv bitstream
+		//LOG("--- Before ResetEvent()\n");
+		ResetEvent(ctx->event_yuv);
+		ctx->is_waiting = 1;
+		WaitForSingleObject(ctx->event_yuv, INFINITE); 
+		ctx->is_waiting = 0;
+		frame_bs = dec_get_free_yuv_bitstream(ctx);
+		//LOG("--- After WaitForSingleObject(), frame_bs = %p\n", frame_bs);
+
+		if (NULL == frame_bs) {
+			return -1;
+		}
 	}
 
 	info = &surface->Info;
@@ -854,6 +925,9 @@ mfxStatus dec_decode_header(intel_ctx *ctx)
 	// init dec
 	MFXVideoDECODE_Init(*ctx->session, ctx->param);
 
+	// init start time
+	ctx->elapsed_time = clock();
+
 	ctx->is_param_inited = 1;
 
 	return sts;
@@ -933,19 +1007,16 @@ JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle)
 
 
 /**
-*   @desc:  get video information
-*   @param: disp_width[out]: width
-*   @param: disp_height[out]: height
-*   @param: handle: decode handle fater init by jm_intel_dec_init()
-*
-*   @return: 0 - successful, else failed
-*/
-JMDLL_FUNC int jm_intel_dec_stream_info(int *in_data_len, handle_inteldec handle)
+ *   @desc:  show decode informationt
+ *   @param: handle: decode handle fater init by jm_intel_dec_init()
+ *
+ *   @return: return char *
+ */
+JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle)
 {
 	intel_ctx *ctx = (intel_ctx *)handle;
 
-	*in_data_len = ctx->in_bs->DataLength;
-	return 0;
+	return ctx->dec_info;
 }
 
 JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle)

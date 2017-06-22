@@ -9,9 +9,7 @@
 *  Desc:       This sample code test intel_dec library
 *****************************************************************************/
 #include <stdio.h>
-//extern "C" {
 #include "jm_intel_dec.h"
-//}
 #pragma warning(disable : 4996)
 
 #pragma comment(lib,"intel_dec.lib")
@@ -19,7 +17,7 @@
 int save_yuv_frame(unsigned char *out_buf, int out_len, void *user_data)
 {
 	FILE *ofile = (FILE*)user_data;
-	//fwrite(out_buf, 1, out_len, ofile);
+	fwrite(out_buf, 1, out_len, ofile);
 
 	return 0;
 }
@@ -42,7 +40,7 @@ int main(int argc, char **argv)
 	ifile = fopen("f:\\justin_zcam2.264", "rb");
 	//C:\Users\justin\Downloads\Temp
 	///ofile = fopen("f://justin_zcam2.264.yuv", "wb");
-	ofile = fopen("C:\\Users\\justin\\Downloads\\Temp\\justin_zcam2.264.yuv", "wb");
+	ofile = fopen("f:\\justin_zcam2.264.yuv", "wb");
 
 
 
@@ -50,7 +48,7 @@ int main(int argc, char **argv)
 
 	jm_intel_dec_init(0, 0, dec_handle);
 
-	jm_intel_dec_set_yuv_callback(ofile, save_yuv_frame, dec_handle);
+	//jm_intel_dec_set_yuv_callback(ofile, save_yuv_frame, dec_handle);
 
 	int ret = 0;
 	int read_len = 0, write_len = 0;
@@ -72,23 +70,16 @@ int main(int argc, char **argv)
 			}
 		}
 
-#if 0
 		ret = jm_intel_dec_output_frame(out_buf, &yuv_len, dec_handle);
 		if (0 == ret/* && yuv_len > 0*/) {
-			//write_len = fwrite(out_buf, 1, yuv_len, ofile);
+			write_len = fwrite(out_buf, 1, yuv_len, ofile);
 		}
-		else if (ret < 0) {
-			// 
-			if (-2 == ret)
-				break;
-		}
-#endif
 
 
 	}
 
 
-
+	printf(jm_intel_dec_stream_info(dec_handle));
 
 	jm_intel_dec_deinit(dec_handle);
 

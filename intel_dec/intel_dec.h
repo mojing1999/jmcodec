@@ -26,7 +26,7 @@
 #endif
 
 
-
+#define MAX_LEN_DEC_INFO	(1024)
 typedef int (*YUV_CALLBACK)(unsigned char *out_buf, int out_len, void *user_data);
 
 enum  
@@ -62,6 +62,8 @@ typedef struct _intel_ctx
 	int 			num_yuv;
 	std::queue<mfxBitstream *> *yuv_queue;
 	HANDLE			mutex_yuv;
+	HANDLE			event_yuv;
+	bool			is_waiting;
 	//
 
 	HANDLE 			dec_thread;
@@ -73,11 +75,14 @@ typedef struct _intel_ctx
 	int 	hw_try;
 
 	uint32_t num_yuv_frames;
+	uint32_t elapsed_time;
 
-	int		is_exit;
+	bool		is_exit;
 
 	void	*user_data;
 	YUV_CALLBACK yuv_callback;
+
+	char	dec_info[MAX_LEN_DEC_INFO];
 
 }intel_ctx;
 
@@ -98,11 +103,14 @@ int intel_dec_set_eof(int is_eof, intel_ctx *ctx);
 
 int intel_dec_set_yuv_callback(void *user_data, YUV_CALLBACK fn, intel_ctx *ctx);
 
+int intel_dec_show_info(intel_ctx *ctx);
+
 int dec_get_input_data_len(intel_ctx *ctx);
 
 // init 
 mfxStatus dec_init_session(intel_ctx *ctx);
 uint32_t dec_get_codec_id_by_type(int codec_type, intel_ctx *ctx);
+char *dec_get_codec_id_string(intel_ctx *ctx);
 
 int dec_create_decode_thread(intel_ctx *ctx);
 int dec_wait_thread_exit(intel_ctx *ctx);
@@ -129,6 +137,8 @@ int dec_conver_surface_to_bistream(mfxFrameSurface1 *surface, intel_ctx *ctx);
 mfxStatus dec_handle_cached_frame(intel_ctx *ctx);
 mfxStatus dec_decode_packet(intel_ctx *ctx);
 mfxStatus dec_decode_header(intel_ctx *ctx);
+
+
 
 #if 0
 intel_ctx *intel_dec_create();

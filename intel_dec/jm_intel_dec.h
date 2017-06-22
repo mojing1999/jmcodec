@@ -46,6 +46,16 @@ JMDLL_FUNC int jm_intel_dec_init(int codec_type, int out_fmt, handle_inteldec ha
  */
 JMDLL_FUNC int jm_intel_dec_deinit(handle_inteldec handle);	//
 
+/**
+ *   @desc:  set yuv output callback, if callback non null, yuv will output to callback, API jm_intel_dec_output_frame will  no yuv output.
+ *	 @param: user_data: callback param.
+ *	 @param: callback: callback function.
+ *   @param: handle: decode handle return by jm_intel_dec_create_handle()
+ *
+ *   @return: 0 - successful, else failed
+ */
+JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBACK callback, handle_inteldec handle);
+
 /** 
  *   @desc:   decode video frame
  *   @param: in_buf[in]: video frame data, 
@@ -57,7 +67,7 @@ JMDLL_FUNC int jm_intel_dec_deinit(handle_inteldec handle);	//
 JMDLL_FUNC int jm_intel_dec_input_data(unsigned char *in_buf, int in_data_len, handle_inteldec handle);
 
 /** 
- *   @desc:   get yuv frame, if no data output, will return failed.
+ *   @desc:  get yuv frame, if no data output, will return failed. If user has been set YUV callback function, this API wil no yuv output.
  *   @param: out_buf[out]: output YUV data buffer
  *   @param: out_len[out]: we cab set out_buf = NULL, output yuv frame size.
  *   @param: handle: decode handle fater init by jm_intel_dec_init()
@@ -74,21 +84,18 @@ JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle);
 
 
 /** 
- *   @desc:  get video information
- *   @param: disp_width[out]: width
- *   @param: disp_height[out]: height
+ *   @desc:  show decode informationt
  *   @param: handle: decode handle fater init by jm_intel_dec_init()
  *
- *   @return: 0 - successful, else failed
+ *   @return: return char * 
  */
-JMDLL_FUNC int jm_intel_dec_stream_info(int *in_data_len, handle_inteldec handle);
+JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle);
 
 
 JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle);
 
 JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle);
 
-JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBACK callback, handle_inteldec handle);
 
 JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle);
 
