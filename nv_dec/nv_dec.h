@@ -88,12 +88,8 @@ typedef struct nvdec_ctx
 	std::queue<CUVIDPARSERDISPINFO *>	*frame_queue;
 	HANDLE		mutex_for_queue;
 
-	// stream information
 
-	//CUVIDEOFORMAT *format;
-
-
-	//int out_format;	// 0: NV12 , 1: ARGB
+	int out_fmt;	// 0: NV12 , 1: ARGB
 	CUvideoctxlock	ctx_lock;
 
 #if 0
@@ -122,7 +118,7 @@ typedef struct nvdec_ctx
 
 
 nvdec_ctx *nvdec_ctx_create();
-int nvdec_decode_init(int codec_type, char *extra_data, int len, nvdec_ctx *ctx);
+int nvdec_decode_init(int codec_type, int out_fmt, char *extra_data, int len, nvdec_ctx *ctx);
 int nvdec_decode_deinit(nvdec_ctx *ctx);
 
 int nvdec_frame_queue_init(nvdec_ctx *ctx);

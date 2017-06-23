@@ -56,11 +56,12 @@ nvdec_ctx *nvdec_ctx_create()
 	return ctx;
 }
 
-int nvdec_decode_init(int codec_type, char *extra_data, int len, nvdec_ctx *ctx)
+int nvdec_decode_init(int codec_type, int out_fmt, char *extra_data, int len, nvdec_ctx *ctx)
 {
 	int ret = 0;
 	// 
 	ctx->is_first_frame = 1;
+	LOG("nvdec_decode_init()\n");
 
 	// init cuda
 	ret = nvdec_cuda_init(ctx);
@@ -76,6 +77,7 @@ int nvdec_decode_init(int codec_type, char *extra_data, int len, nvdec_ctx *ctx)
 
 int nvdec_decode_deinit(nvdec_ctx *ctx)
 {
+	LOG("nvdec_decode_deinit()\n");
 	//
 	nvdec_frame_queue_deinit(ctx);
 
@@ -213,6 +215,7 @@ int nvdec_cuda_init(nvdec_ctx *ctx)
 	// create the cuda context and pop the current one
 	ret = cuCtxCreate(&ctx->cuda_ctx, CU_CTX_SCHED_BLOCKING_SYNC, ctx->cuda_dev);
 
+	LOG("cuda init - cuda dev count = %d\n", dev_count);
 
 	//ret = cuCtxPopCurrent(&cuda_ctx_dummy);
 
@@ -255,6 +258,7 @@ int nvdec_create_parser(int codec_type, char *extra_data, int len, nvdec_ctx *ct
 	CUcontext dummy;
 	int ret = 0;
 
+	LOG("create parser...\n");
 	memset(&ctx->cuparse_info, 0, sizeof(CUVIDPARSERPARAMS));
 	memset(&ctx->cuparse_ext, 0, sizeof(CUVIDEOFORMATEX));
 	memset(&ctx->cuvid_pkt, 0x0, sizeof(CUVIDSOURCEDATAPACKET));
@@ -427,6 +431,9 @@ int nvdec_decode_output_frame(int *got_frame, nvdec_ctx *ctx)
 		//
 		nvdec_frame_item_release(disp_info, ctx);
 	}
+	else {
+		LOG("lost frame.........\n");
+	}
 	
 	if (mapped_frame) {
 		ret = cuvidUnmapVideoFrame(ctx->cudecoder, mapped_frame);
@@ -585,15 +592,16 @@ JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle()
 /** 
  *   @desc:   Init decode before use
  *   @param: codec_type:  0 - H.264,  1 - H.265
+ *   @param: out_fmt:  0 - NV12,  1 - YV12
  *   @param: extra_data: sps or pps buffer, = NULL is OK
  *   @param: len: extra_data length
  *   @param: handle: decode handle return by jm_nvdec_create_handle()
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_init(int codec_type, char *extra_data, int len, handle_nvdec handle)
+JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle)
 {
-	return nvdec_decode_init(codec_type, extra_data, len, (nvdec_ctx*)handle);
+	return nvdec_decode_init(codec_type, out_fmt, extra_data, len, (nvdec_ctx*)handle);
 }
 
 /** 

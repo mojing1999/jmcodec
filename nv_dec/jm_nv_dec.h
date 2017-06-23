@@ -29,13 +29,14 @@ JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle();	//
 /** 
  *   @desc:   Init decode before use
  *   @param: codec_type:  0 - H.264,  1 - H.265
+ *   @param: out_fmt:  0 - NV12,  1 - YV12
  *   @param: extra_data: sps or pps buffer, = NULL is OK
  *   @param: len: extra_data length
  *   @param: handle: decode handle return by jm_nvdec_create_handle()
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_init(int codec_type, char *extra_data, int len, handle_nvdec handle);	//
+JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle);	//
 
 /** 
  *   @desc:   destroy decode handle

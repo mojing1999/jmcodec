@@ -140,49 +140,4 @@ mfxStatus dec_decode_header(intel_ctx *ctx);
 
 
 
-#if 0
-intel_ctx *intel_dec_create();
-
-
-int intel_dec_set_eof(int is_eof, intel_ctx *ctx);
-
-intel_ctx *intel_dec_create();
-int intel_dec_init(int codec_type, int out_fmt, intel_ctx *ctx);
-int intel_dec_deinit(intel_ctx *ctx);
-
-int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx);
-
-/*
- *	@desc: if intel decode need more input data, return ture, else return false.
- */
-bool intel_dec_need_more_data(intel_ctx *ctx);
-
-/*
- *	#desc: return input buffer length, that App can input more data
- */
-int intel_dec_get_input_free_buf_len(intel_ctx *ctx);
-
-int dec_get_input_data_len(intel_ctx *ctx);
-
-mfxStatus dec_init_bitstream(int buf_size, mfxBitstream *pbs);
-int dec_extend_bitstream(int new_size, mfxBitstream *pbs);
-int dec_release_bitstream(mfxBitstream *pbs);
-
-int dec_init_yuv_output(intel_ctx *ctx);
-int dec_deinit_yuv_output(intel_ctx *ctx);
-
-int dec_create_decode_thread(intel_ctx *ctx);
-int dec_wait_thread_exit(intel_ctx *ctx);
-
-mfxStatus dec_handle_cached_frame(intel_ctx *ctx);
-int dec_get_free_surface_index(intel_ctx *ctx);
-
-mfxStatus dec_decode_packet(intel_ctx *ctx);
-mfxStatus dec_decode_header(intel_ctx *ctx);
-
-mfxStatus dec_init_session(intel_ctx *ctx);
-uint32_t dec_get_codec_id_by_type(int codec_type, intel_ctx *ctx);
-
-#endif
-
 #endif	// _INTEL_DECODER_H_

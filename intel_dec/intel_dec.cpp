@@ -564,6 +564,14 @@ int dec_deinit_yuv_output(intel_ctx *ctx)
 {
 	int i = 0; 
 
+	if (ctx->event_yuv) {
+		CloseHandle(ctx->event_yuv);
+	}
+
+	if (ctx->mutex_yuv) {
+		CloseHandle(ctx->mutex_yuv);
+	}
+
 	for (i = 0; i < ctx->num_yuv; i++) {
 		delete[] ctx->arr_yuv[i]->Data;
 		delete ctx->arr_yuv[i];
