@@ -91,12 +91,28 @@ JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle);
  */
 JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle);
 
-
+/**
+ *   @desc:  check whether decode need more input data.
+ *   @param: handle: decode handle fater init by jm_intel_dec_init()
+ *
+ *   @return: if need more input data, return true, else return false.
+ */
 JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle);
 
+/**
+ *   @desc:  get decode input data buffer free length, app can not input data greater than return length
+ *   @param: handle: decode handle fater init by jm_intel_dec_init()
+ *
+ *   @return: return free buffer length
+ */
 JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle);
 
-
+/**
+ *   @desc:  after app set eof to decode, decode will output the cached frame, then exit
+ *   @param: handle: decode handle fater init by jm_intel_dec_init()
+ *
+ *   @return: return true if decode exit, else return false.
+ */
 JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle);
 
 #endif	//_JM_INTEL_DECODER_H_
