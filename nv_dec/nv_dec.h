@@ -29,8 +29,9 @@
     #define LOG( ... )              
 #endif
 
-#define NVDEC_MAX_FRAMES 3
-//#define __cu(a) do { CUresult  ret; if ((ret = (a)) != CUDA_SUCCESS) { /*fprintf(stderr, "%s has returned CUDA error %d\n", #a, ret); */return -1;}} while(0)
+#define NVDEC_MAX_FRAMES 10
+#define MAX_LEN_DEC_INFO	(1024)
+ //#define __cu(a) do { CUresult  ret; if ((ret = (a)) != CUDA_SUCCESS) { /*fprintf(stderr, "%s has returned CUDA error %d\n", #a, ret); */return -1;}} while(0)
 
 
 enum NV_CODEC_TYPE {
@@ -103,7 +104,12 @@ typedef struct nvdec_ctx
 	CUstream			kernel_sid;
 #endif
 	//
-	int		is_flush;
+	//int		is_flush;
+	bool		is_eof;
+	bool		is_exit;
+	uint32_t	num_frames;
+	uint32_t	elapsed_time;
+	char		dec_info[MAX_LEN_DEC_INFO];
 
 	//int		is_readback;
 
@@ -113,6 +119,7 @@ typedef struct nvdec_ctx
 	int cur_out_frame_idx;
 	nv_frame_buf *cur_out_frame;
 	int is_first_frame;
+
 
 }nvdec_ctx;
 
@@ -140,6 +147,11 @@ int nvdec_create_decoder(CUVIDEOFORMAT* format, nvdec_ctx *ctx);
 int nvdec_out_frame_init(uint32_t pitch, uint32_t height, nvdec_ctx *ctx);
 int nvdec_out_frame_deinit(nvdec_ctx *ctx);
 
+void nvdec_set_eof(bool is_eof, nvdec_ctx *ctx);
+bool nvdec_is_exit(nvdec_ctx *ctx);
+
+char *nvdec_get_codec_id_string(nvdec_ctx *ctx);
+void nvdec_show_info(nvdec_ctx *ctx);
 
 
 

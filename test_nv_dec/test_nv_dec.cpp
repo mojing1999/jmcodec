@@ -64,18 +64,19 @@ unsigned char *find_nalu(unsigned char *buf, int size, int *nalu_len)
 	unsigned char *p = buf;
 	int offset1 = 0, offset2 = 0;
 
-	int prefix = 0;
-	offset1 = find_nalu_prefix(p, size, &prefix);
+	int prefix1 = 0;
+	int prefix2 = 0;
+	offset1 = find_nalu_prefix(p, size, &prefix1);
 
 	// offset1 should be 0
-	offset2 = find_nalu_prefix(p + offset1 + prefix, size - prefix - offset1, &prefix);
+	offset2 = find_nalu_prefix(p + offset1 + prefix1, size - prefix1 - offset1, &prefix2);
 
 	if (-1 == offset2) {
 		*nalu_len = 0;
 		p = NULL;
 	}
 	else {
-		*nalu_len = offset2 + prefix;
+		*nalu_len = offset2 + prefix1;
 		p = p + offset1;
 
 	}
@@ -98,9 +99,10 @@ int main(int argc, char **argv)
 	out_buf = new unsigned char[out_len];
 
 
-	ifile = fopen("f:\\justin_zcam2.264", "rb");
-	//ofile = fopen("f:\\4.track_2.264.yuv", "wb");
-	ofile = fopen("f:\\justin_zcam2.264.yuv", "wb");
+	//ifile = fopen("f:\\justin_zcam2.264", "rb");
+	ifile = fopen("f:\\4.track_2.264", "rb");
+	ofile = fopen("f:\\4.track_2.264.yuv", "wb");
+	//ofile = fopen("f:\\justin_zcam2.264.yuv", "wb");
 
 	int ret = 0;
 	int read_len = 0, write_len = 0;
@@ -159,75 +161,80 @@ int main(int argc, char **argv)
 
 	long elapsed_time = clock();
 	unsigned long frame_count = 0;
-	while (1) {
-		nalu = find_nalu(buf, buf_len, &nalu_len);
 
-		if (nalu) {
+	long nalu_count = 0;
 
-			jm_nvdec_decode_frame(nalu, nalu_len, &got_frame, dec_handle);
-			if (1 == got_frame) {
-				yuv_len = out_len;
-				jm_nvdec_output_frame(0, out_buf, &yuv_len, dec_handle);
-				if (yuv_len > 0) {
-					frame_count += 1;
-					write_len = fwrite(out_buf, 1, yuv_len, ofile);
+	while (!jm_nvdec_is_exit(dec_handle)) {
+		if (0 == is_eof) {
+			nalu = find_nalu(buf, buf_len, &nalu_len);
+
+			if (!nalu) {
+				// need more data
+				//if (0 == is_eof) {
+				memmove(in_buf, buf, buf_len);
+				read_len = fread(in_buf + buf_len, 1, in_len - buf_len, ifile);
+
+				buf_len += read_len;
+				buf = in_buf;
+
+				if (0 == read_len) {
+					is_eof = 1;
+					nalu = buf;
+					nalu_len = buf_len;
+					//jm_nvdec_set_eof(1, dec_handle);
 				}
+				//}
+				continue;
 			}
 
 			buf += nalu_len;
 			buf_len -= nalu_len;
-		}
-		else {
-			// need more data
-			memmove(in_buf, buf, buf_len);
-			read_len = fread(in_buf, 1, in_len - buf_len, ifile);
-			if (0 == read_len) {
-				is_eof = 1;
 
-				break;
-			}
 		}
+
+		if ((nalu)/* ||(1 == is_eof)*/) {
+			// decode nalu
+			nalu_count += 1;
+			jm_nvdec_decode_frame(nalu, nalu_len, &got_frame, dec_handle);
+			if (1 == got_frame) {
+				yuv_len = out_len;
+				jm_nvdec_output_frame(out_buf, &yuv_len, dec_handle);
+				if (yuv_len > 0) {
+					frame_count += 1;
+					//write_len = fwrite(out_buf, 1, yuv_len, ofile);
+				}
+			}
+
+			if (1 == is_eof) {
+				// last nalu
+				nalu = 0;
+				nalu_len = 0;
+				//jm_nvdec_set_eof(1, dec_handle);
+			}
+			//}
+
+		}
+		else if (1 == is_eof) {
+			// decode cached frame
+			nalu_count += 1;
+			jm_nvdec_decode_frame(NULL, 0, &got_frame, dec_handle);
+			if (1 == got_frame) {
+				yuv_len = out_len;
+				jm_nvdec_output_frame(out_buf, &yuv_len, dec_handle);
+				if (yuv_len > 0) {
+					frame_count += 1;
+					//write_len = fwrite(out_buf, 1, yuv_len, ofile);
+				}
+			}
+
+		}
+
 
 	}
 
-	while (1)
-	{
-		jm_nvdec_decode_frame(nalu, nalu_len, &got_frame, dec_handle);
-		if (1 == got_frame) {
-			yuv_len = out_len;
-			jm_nvdec_output_frame(0, out_buf, &yuv_len, dec_handle);
-			if (yuv_len > 0) {
-				frame_count += 1;
-				write_len = fwrite(out_buf, 1, yuv_len, ofile);
-			}
-		}
-		else {
-			break;
-		}
+	printf(jm_nvdec_show_dec_info(dec_handle));
 
-	}
-
-	int width = 0, height = 0;
-	jm_nvdec_stream_info(&width, &height, dec_handle);
-	elapsed_time = clock() - elapsed_time;
-
-	printf(
-		"==========================================\n"
-		"Codec:\t\t%s\n"
-		"Display:\t%d x %d\n"
-		"Pixel Format:\t%s\n"
-		"Frame Count:\t%d\n"
-		"Elapsed Time:\t%d ms\n"
-		"Decode FPS:\t%f fps\n"
-		"==========================================\n",
-		"H.264",
-		width, height,
-		"NV12",
-		frame_count,
-		elapsed_time,
-		(double)frame_count * CLOCKS_PER_SEC / (double)elapsed_time
-
-	);
+	printf("------nalu count = %d\n", nalu_count);
 	
 
 	//printf(jm_intel_dec_stream_info(dec_handle));

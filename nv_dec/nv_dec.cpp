@@ -11,6 +11,8 @@
 #include "nv_dec.h"
 #include "jm_nv_dec.h"
 
+#include <time.h>
+
 #if defined(_WIN32)
 #define CUDAAPI __stdcall
 #else
@@ -34,7 +36,7 @@ static int CUDAAPI cuvid_handle_picture_decode(void *opaque, CUVIDPICPARAMS* pic
 
 	CUresult ret = cuvidDecodePicture(ctx->cudecoder, picparams);
 
-	return (CUDA_SUCCESS == ret ? 1 : 0);
+	return 1;
 
 }
 
@@ -43,6 +45,7 @@ static int CUDAAPI cuvid_handle_picture_display(void *opaque, CUVIDPARSERDISPINF
 {
 	nvdec_ctx *ctx = (nvdec_ctx *)opaque;
 
+	ctx->num_frames += 1;
 	int ret = nvdec_frame_queue_push(dispinfo, ctx);
 
 	return 1;
@@ -78,6 +81,9 @@ int nvdec_decode_init(int codec_type, int out_fmt, char *extra_data, int len, nv
 int nvdec_decode_deinit(nvdec_ctx *ctx)
 {
 	LOG("nvdec_decode_deinit()\n");
+
+	//nvdec_show_info(ctx);
+
 	//
 	nvdec_frame_queue_deinit(ctx);
 
@@ -121,6 +127,7 @@ int nvdec_frame_queue_init(nvdec_ctx *ctx)
 int nvdec_frame_queue_deinit(nvdec_ctx *ctx)
 {
 	// pop frame queue
+	//LOG("----------frame count: %d\n", ctx->num_frames);
 
 	// delete frame queue
 	if (ctx->frame_queue) {
@@ -316,7 +323,7 @@ int nvdec_create_parser(int codec_type, char *extra_data, int len, nvdec_ctx *ct
 
 
 	ctx->cuparse_info.ulMaxNumDecodeSurfaces = NVDEC_MAX_FRAMES;
-	ctx->cuparse_info.ulMaxDisplayDelay = 4;
+	ctx->cuparse_info.ulMaxDisplayDelay = 2;
 	ctx->cuparse_info.pUserData = ctx;
 	ctx->cuparse_info.pfnSequenceCallback = cuvid_handle_video_sequence;
 	ctx->cuparse_info.pfnDecodePicture = cuvid_handle_picture_decode;
@@ -349,7 +356,7 @@ int nvdec_decode_packet(uint8_t *in_buf, int in_data_len, nvdec_ctx *ctx)
 
 	CUcontext dummy;
 
-	if (ctx->is_flush && in_data_len > 0)
+	if (ctx->is_eof)
 		return 0;
 
 
@@ -366,7 +373,7 @@ int nvdec_decode_packet(uint8_t *in_buf, int in_data_len, nvdec_ctx *ctx)
 	}
 	else {
 		ctx->cuvid_pkt.flags = CUVID_PKT_ENDOFSTREAM;
-		ctx->is_flush = 1;
+		ctx->is_eof = 1;
 	}
 
 	ret = cuvidParseVideoData(ctx->cuparser, &ctx->cuvid_pkt);
@@ -432,7 +439,11 @@ int nvdec_decode_output_frame(int *got_frame, nvdec_ctx *ctx)
 		nvdec_frame_item_release(disp_info, ctx);
 	}
 	else {
-		LOG("lost frame.........\n");
+		if (ctx->is_eof) {
+			ctx->elapsed_time = clock() - ctx->elapsed_time;
+			ctx->is_exit = true;
+			nvdec_show_info(ctx);
+		}
 	}
 	
 	if (mapped_frame) {
@@ -453,7 +464,7 @@ int nvdec_decode_frame(uint8_t *in_buf, int in_data_len, int *got_frame, nvdec_c
 	int ret = 0;
 	*got_frame = 0;
 	// decode packet
-	if (!ctx->is_flush) {
+	if (!ctx->is_eof) {
 		ret = nvdec_decode_packet(in_buf, in_data_len, ctx);
 	}
 
@@ -491,12 +502,15 @@ int nvdec_create_decoder(CUVIDEOFORMAT* format, nvdec_ctx *ctx)
 	cuinfo->ulNumDecodeSurfaces = NVDEC_MAX_FRAMES;
 	cuinfo->ulNumOutputSurfaces = 1;
 	cuinfo->ulCreationFlags = cudaVideoCreate_PreferCUVID;// cudaVideoCreate_PreferCUDA;
-	cuinfo->bitDepthMinus8 = format->bit_depth_luma_minus8;
-	cuinfo->DeinterlaceMode = cudaVideoDeinterlaceMode_Weave;
+	//cuinfo->bitDepthMinus8 = format->bit_depth_luma_minus8;
+	//cuinfo->DeinterlaceMode = cudaVideoDeinterlaceMode_Weave;
 	cuinfo->vidLock = ctx->ctx_lock;
 
 
 	ret = cuvidCreateDecoder(&ctx->cudecoder, cuinfo);
+
+	// 
+	ctx->elapsed_time = clock();
 
 	return 0;
 }
@@ -574,6 +588,72 @@ int nvdec_out_frame_deinit(nvdec_ctx *ctx)
 	return ret;
 }
 
+void nvdec_set_eof(bool is_eof, nvdec_ctx *ctx)
+{
+	ctx->is_eof = is_eof;
+}
+
+bool nvdec_is_exit(nvdec_ctx *ctx)
+{
+	return ctx->is_exit;
+}
+
+char *nvdec_get_codec_id_string(nvdec_ctx *ctx)
+{
+	switch (ctx->dec_create_info.CodecType)
+	{
+	case cudaVideoCodec_MPEG1:
+		return "MPEG1";
+	case cudaVideoCodec_MPEG2:
+		return "MPEG2";
+	case cudaVideoCodec_MPEG4:
+		return "MPEG4";
+	case cudaVideoCodec_VC1:
+		return "VC1";
+	case cudaVideoCodec_H264:
+		return "H.264";
+	case cudaVideoCodec_JPEG:
+		return "JPEG";
+	case cudaVideoCodec_H264_SVC:
+		return "SVC";
+	case cudaVideoCodec_H264_MVC:
+		return "H.264-MVC";
+	case cudaVideoCodec_HEVC:
+		return "H.265";
+	case cudaVideoCodec_VP8:
+		return "VP8";
+	case cudaVideoCodec_VP9:
+		return "VP9";
+
+	default:
+		return "UNKNOW";
+	}
+
+	return "UNKNOW";
+}
+
+void nvdec_show_info(nvdec_ctx *ctx)
+{
+
+	sprintf_s(ctx->dec_info, MAX_LEN_DEC_INFO,
+		"==========================================\n"
+		"Codec:\t\t%s\n"
+		"Display:\t%d x %d\n"
+		"Pixel Format:\t%s\n"
+		"Frame Count:\t%d\n"
+		"Elapsed Time:\t%d ms\n"
+		"Decode FPS:\t%f fps\n"
+		"==========================================\n",
+		nvdec_get_codec_id_string(ctx),
+		ctx->dec_create_info.ulWidth, ctx->dec_create_info.ulHeight,
+		ctx->out_fmt == 0 ? "NV12" : "YV12",
+		ctx->num_frames,
+		ctx->elapsed_time,
+		(double)ctx->num_frames * CLOCKS_PER_SEC / (double)ctx->elapsed_time);
+
+	//LOG(ctx->dec_info);
+}
+
 
 
 /****************************************************************************************
@@ -584,7 +664,7 @@ int nvdec_out_frame_deinit(nvdec_ctx *ctx)
  *	 
  *	@return: handle for use
  */
-JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle()
+JMDLL_FUNC handle_nvdec jm_nvdec_create_handle()
 {
 	return (handle_nvdec)nvdec_ctx_create();
 }
@@ -599,7 +679,7 @@ JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle()
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle)
+JMDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle)
 {
 	return nvdec_decode_init(codec_type, out_fmt, extra_data, len, (nvdec_ctx*)handle);
 }
@@ -610,7 +690,7 @@ JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle)
+JMDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle)
 {
 	return nvdec_decode_deinit((nvdec_ctx*)handle);
 }
@@ -624,7 +704,7 @@ JMTDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle)
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, int *got_frame, handle_nvdec handle)
+JMDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, int *got_frame, handle_nvdec handle)
 {
 	nvdec_ctx *ctx = (nvdec_ctx*)handle;
 	return nvdec_decode_frame(in_buf, in_data_len, got_frame, ctx);
@@ -633,14 +713,13 @@ JMTDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, in
 
 /** 
  *   @desc:   if got_frame get 1 from jm_nvdec_decode_frame(), call this function to get YUV data
- *   @param: out_fmt[in]: YUV format type, 0 - NV12, 1 - YUV420(YV12)
  *   @param: out_buf[out]: output YUV data buffer
  *   @param: out_len[in][out]: [in] out_buf buffer size, if < YUV420 frame size, will return error(-1), [out]YUV420 frame size.
  *   @param: handle: decode handle fater init by jm_nvdec_init()
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_output_frame(int out_fmt, unsigned char *out_buf, int *out_len, handle_nvdec handle)
+JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handle_nvdec handle)
 {
 	nvdec_ctx *ctx = (nvdec_ctx *)handle;
 	int width	= ctx->dec_create_info.ulWidth;
@@ -659,7 +738,7 @@ JMTDLL_FUNC int jm_nvdec_output_frame(int out_fmt, unsigned char *out_buf, int *
 	int x, y, w2, h2;
 	int xy_offset = width * height;
 
-	if (0 == out_fmt) {
+	if (0 == ctx->out_fmt) {
 		// NV12
 		for (y = 0; y < height * 3 / 2; y++) {
 			memcpy(&pdst[y*width], py, width);
@@ -704,7 +783,7 @@ JMTDLL_FUNC int jm_nvdec_output_frame(int out_fmt, unsigned char *out_buf, int *
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_nvdec handle)
+JMDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_nvdec handle)
 {
 	nvdec_ctx *ctx = (nvdec_ctx *)handle;
 	*disp_width = ctx->dec_create_info.ulWidth;
@@ -714,4 +793,17 @@ JMTDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_n
 }
 
 
+JMDLL_FUNC void jm_nvdec_set_eof(bool is_eof, handle_nvdec handle)
+{
+	nvdec_set_eof(is_eof, (nvdec_ctx *)handle);
+}
 
+JMDLL_FUNC bool jm_nvdec_is_exit(handle_nvdec handle)
+{
+	return nvdec_is_exit((nvdec_ctx *)handle);
+}
+
+JMDLL_FUNC char* jm_nvdec_show_dec_info(handle_nvdec handle)
+{
+	return ((nvdec_ctx *)handle)->dec_info;
+}

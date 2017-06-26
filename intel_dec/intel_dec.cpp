@@ -55,6 +55,9 @@ DWORD WINAPI decode_thread_proc(LPVOID param)
 	// output decoder cached frame
 	dec_handle_cached_frame(ctx);
 
+	// has been decoded all frame, exit.
+	ctx->elapsed_time = clock() - ctx->elapsed_time;
+
 	intel_dec_show_info(ctx);
 
 	ctx->is_exit = true;
@@ -497,9 +500,7 @@ int dec_extend_bitstream(int new_size, mfxBitstream *pbs)
 
 int intel_dec_show_info(intel_ctx *ctx)
 {
-	uint32_t cur_time;
-	cur_time = clock();
-	ctx->elapsed_time = clock() - ctx->elapsed_time;
+	//ctx->elapsed_time = clock() - ctx->elapsed_time;
 	sprintf_s(ctx->dec_info, MAX_LEN_DEC_INFO,
 		"==========================================\n"
 		"Codec:\t\t%s\n"

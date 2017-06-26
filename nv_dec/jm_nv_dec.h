@@ -12,7 +12,7 @@
 #define _JM_NV_DECODER_H_
 
 #ifndef PISOFTDLL_FUNC
-#define JMTDLL_FUNC		_declspec(dllexport)
+#define JMDLL_FUNC		_declspec(dllexport)
 #define JMDLL_API		__stdcall
 #endif
 
@@ -24,7 +24,7 @@ typedef void * handle_nvdec;
  *   
  *  @return: handle for use
  */
-JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle();	//
+JMDLL_FUNC handle_nvdec jm_nvdec_create_handle();	//
 
 /** 
  *   @desc:   Init decode before use
@@ -36,7 +36,7 @@ JMTDLL_FUNC handle_nvdec jm_nvdec_create_handle();	//
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle);	//
+JMDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int len, handle_nvdec handle);	//
 
 /** 
  *   @desc:   destroy decode handle
@@ -44,7 +44,7 @@ JMTDLL_FUNC int jm_nvdec_init(int codec_type, int out_fmt, char *extra_data, int
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle);	//
+JMDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle);	//
 
 /** 
  *   @desc:   decode video frame
@@ -55,18 +55,17 @@ JMTDLL_FUNC int jm_nvdec_deinit(handle_nvdec handle);	//
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, int *got_frame, handle_nvdec handle);
+JMDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, int *got_frame, handle_nvdec handle);
 
 /** 
  *   @desc:   if got_frame get 1 from jm_nvdec_decode_frame(), call this function to get YUV data
- *   @param: out_fmt[in]: YUV format type, 0 - NV12, 1 - YUV420(YV12)
  *   @param: out_buf[out]: output YUV data buffer
  *   @param: out_len[in][out]: [in] out_buf buffer size, if < YUV420 frame size, will return error(-1), [out]YUV420 frame size.
  *   @param: handle: decode handle fater init by jm_nvdec_init()
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_output_frame(int out_fmt, unsigned char *out_buf, int *out_len, handle_nvdec handle);
+JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handle_nvdec handle);
 
 
 /** 
@@ -77,7 +76,13 @@ JMTDLL_FUNC int jm_nvdec_output_frame(int out_fmt, unsigned char *out_buf, int *
  *
  *   @return: 0 - successful, else failed
  */
-JMTDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_nvdec handle);
+JMDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_nvdec handle);
 
+
+JMDLL_FUNC void jm_nvdec_set_eof(bool is_eof, handle_nvdec handle);
+
+JMDLL_FUNC bool jm_nvdec_is_exit(handle_nvdec handle);
+
+JMDLL_FUNC char* jm_nvdec_show_dec_info(handle_nvdec handle);
 
 #endif	//_JM_NV_DECODER_H_
