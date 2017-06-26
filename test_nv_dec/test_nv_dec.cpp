@@ -2,11 +2,11 @@
 *  Copyright (C) 2014 - 2017, Justin Mo.
 *  All rights reserverd.
 *
-*  FileName:  	test_intel_dec.cpp
+*  FileName:  	test_nv_dec.cpp
 *  Author:    	Justin Mo(mojing1999@gmail.com)
 *  Date:        2017-06-23
 *  Version:     V0.01
-*  Desc:        This sample code test intel_dec library
+*  Desc:        This sample code test nvdia decode library
 *****************************************************************************/
 #include <stdio.h>
 #include <Windows.h>
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 
 	dec_handle = jm_nvdec_create_handle();
 	 
-	jm_nvdec_init(0, 0, NULL, 0, dec_handle);
+	jm_nvdec_init(0, 1, NULL, 0, dec_handle);
 
 	//jm_intel_dec_set_yuv_callback(ofile, save_yuv_frame, dec_handle);
 

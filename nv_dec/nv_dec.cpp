@@ -64,6 +64,7 @@ int nvdec_decode_init(int codec_type, int out_fmt, char *extra_data, int len, nv
 	int ret = 0;
 	// 
 	ctx->is_first_frame = 1;
+	ctx->out_fmt = out_fmt;
 	LOG("nvdec_decode_init()\n");
 
 	// init cuda
