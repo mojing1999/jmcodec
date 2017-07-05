@@ -1,141 +1,55 @@
-# video_codec
-nvidia and intel video decode, encode
+# video_codec project
 
 
-使用Intel/Nvidia显卡加速来处理音视频编解码。
-由于工作中多媒体处理比较多， 把自己的这这方面的经验总结，开源到[Github/mojing1999](https://github.com/mojing1999/video_codec)上, 欢迎指教。
-整个项目主要包括：
-1. 使用Intel Media SDK，封装解码和编码库。
-2. 使用Nvidia CUDA TOOLKIT，封装成解码和编码库。
-3. 各个编解码库的调用例子。
+## 1. 介绍
+video_codec 是Justin开源的多媒体编解码硬件加速项目([Github](https://github.com/mojing1999/video_codec))。 支持Intel集显和Nvidia显卡硬件加速。包含以下模块。仅供个人学习使用，商业使用请联系作者(Justin's Email: mojing1999@gmail.com)
+
+#### 1). 封装Intel Media SDK，实现使用Intel集显处理多媒体编解码硬件加速。
+	
+
+	- Intel_dec
+	- Intel_enc
+	- Intel_transcoding
+	
+#### 2). 封装Nvidia CUDA SDK，实现使用Nvidia显卡处理多媒体编解码硬件加速。
+	- nv_dec
+	- nv_enc
+	- nv_transcoding
 
 
-
+#### 3). 相应的测试例子。
+	- test_intel_dec
+	- test_intel_enc
+	- test_intel_transcoding
+	- test_nv_dec
+	- test_nv_enc
+	- test_nv_transcoding
 
 ---
-### 1. Intel Media SDK
-Intel Media SDK 是 Intel 推出的基于Intel集显的编解码硬件加速技术。详见[Intel Media SDK](). Media SDK 提供了 Decoder，VPP，Encoder，让用户方便的处理视频流。
 
+## 2. 基于 Intel 集显的硬件编解码加速
+	
+### intel_dec
 
+#### - 导出 API
+参见 jm_intel_dec.h 头文件。
 
+#### - 使用
 
-#### intel_dec project
-基于Intel Media SDK的硬解码库。 代码主要包括三个文件：
-1. intel_dec.h - 实现 Media SDK 库的封装头文件。
-2. intel_dec.cpp - 实现函数。
-3. jm_intel_dec.h - 该库导出函数定义头文件。
+参见项目 test_intel_dec 。 工程里包含头文件 jm_intel_dec.h 和导入库 intel_dec.lib
 
+```
+#include "jm_intel_dec.h"
 
-jm_intel_dec.h 为导出** API **。需要注意的是：
-1. 用户每次输入需要解码的数据之前，可以调用API jm_intel_dec_need_more_data() 来判断解码器是否需要更多的数据。 如果需要更多的数据，请调用 API jm_intel_dec_free_buf_len() 返回解码器需要数据的长度，用户不能输入长度超过返回值。
-
-2.  YUV 帧输出有以下两种方式，用户可以选择一种。
-	1.  callback 输出。 在调用 jm_intel_dec_init() 后，设置YUV输出Callback函数 jm_intel_dec_set_yuv_callback(). 如果回调函数指针不为空，可以从回调函数里得到YUV帧。
-	2.  手动调用函数获取。 如果不设置回调函数， 可以手动调用 API jm_intel_dec_output_frame()来获取 YUV 帧。 
-
-3.  如果需要停止输入解码数据，请调用API jm_intel_dec_set_eof(), 解码器在解码完缓存的数据后推出。
-  
-
-```C
-/** 
- *  @desc:   create decode handle
- *   
- *  @return: handle for use
- */
-JMDLL_FUNC handle_inteldec jm_intel_dec_create_handle();	//
-
-/** 
- *   @desc:   Init decode before use
- *   @param: codec_type:  0 - H.264,  1 - H.265
- *   @param: out_fmt: output YUV frame format, 0 - NV12, 1 - YV12
- *   @param: handle: decode handle return by jm_intel_dec_create_handle()
- *
- *   @return: 0 - successful, else failed
- */
-JMDLL_FUNC int jm_intel_dec_init(int codec_type, int out_fmt, handle_inteldec handle);	//
-
-/** 
- *   @desc:  destroy decode handle
- *   @param: handle: decode handle return by jm_intel_dec_create_handle()
- *
- *   @return: 0 - successful, else failed
- */
-JMDLL_FUNC int jm_intel_dec_deinit(handle_inteldec handle);	//
-
-/**
- *   @desc:  set yuv output callback, if callback non null, yuv will output to callback, API jm_intel_dec_output_frame will  no yuv output.
- *	 @param: user_data: callback param.
- *	 @param: callback: callback function.
- *   @param: handle: decode handle return by jm_intel_dec_create_handle()
- *
- *   @return: 0 - successful, else failed
- */
-JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBACK callback, handle_inteldec handle);
-
-/** 
- *   @desc:   decode video frame
- *   @param: in_buf[in]: video frame data, 
- *   @param: in_data_len[in]: data length
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: 0 - successful, else failed
- */
-JMDLL_FUNC int jm_intel_dec_input_data(unsigned char *in_buf, int in_data_len, handle_inteldec handle);
-
-/** 
- *   @desc:  get yuv frame, if no data output, will return failed. If user has been set YUV callback function, this API wil no yuv output.
- *   @param: out_buf[out]: output YUV data buffer
- *   @param: out_len[out]: we cab set out_buf = NULL, output yuv frame size.
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: 0 - successful, else failed
- */
-JMDLL_FUNC int jm_intel_dec_output_frame(unsigned char *out_buf, int *out_len, handle_inteldec handle);
-
-
-/*
- *	@desc:	no more data input, set eof to decode, output decoder cached frame
- */
-JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle);
-
-
-/** 
- *   @desc:  show decode informationt
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: return char * 
- */
-JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle);
-
-/**
- *   @desc:  check whether decode need more input data.
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: if need more input data, return true, else return false.
- */
-JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle);
-
-/**
- *   @desc:  get decode input data buffer free length, app can not input data greater than return length
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: return free buffer length
- */
-JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle);
-
-/**
- *   @desc:  after app set eof to decode, decode will output the cached frame, then exit
- *   @param: handle: decode handle fater init by jm_intel_dec_init()
- *
- *   @return: return true if decode exit, else return false.
- */
-JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle);
+#pragma comment(lib,"intel_dec.lib")
 
 
 ```
 
 
-#### 调用流程
+#### - 调用流程
+
+
 ```
 handle_yuv_frame_callback()
 
@@ -157,7 +71,7 @@ loop jm_intel_dec_is_exit()
 	}
 	
 	jm_intel_dec_output_frame() [OPTIONAL]
-	//handle yuv frame 
+	//handle_yuv_frame_callback()
 
 end loop
 
@@ -167,35 +81,108 @@ jm_intel_dec_deinit()
 
 ```
 
-#### 测试程序
-OS: Win10
-CPU: i7-6700
-Memory: 16 GB
+流程图
 
-- 测试解码H.264 文件1， 分辨率为 4096 x 2048 ，输出为YUV420 NV12，不写硬盘， 结果见如下：
+![intel_dec](http://www.justinmo.video/media/intel_dec_flow.png)
+
+
+
+	 
+---
+
+## 3. 基于 Nvidia 显卡硬件编解码加速
+### nv_dec
+
+#### - 导出 API
+参见 jm_nv_dec.h 头文件。
+
+#### - 使用
+
+参见项目 test_nv_dec 。 工程里包含头文件 jm_nv_dec.h 和导入库 nv_dec.lib
 
 ```
-==========================================
-Codec:          H.264
-Display:        4096 x 2048
-Pixel Format:   NV12
-Frame Count:    283
-Elapsed Time:   2169 ms
-Decode FPS:     130.474873 fps
-==========================================
-```
+#include "jm_nv_dec.h"
 
-- 测试文件2， 分辨率为 2704 x 1520, 不写硬盘，结果如下：
+#pragma comment(lib,"nv_dec.lib")
+
 
 ```
-==========================================
-Codec:          H.264
-Display:        2704 x 1520
-Pixel Format:   NV12
-Frame Count:    1363
-Elapsed Time:   5388 ms
-Decode FPS:     252.969562 fps
-==========================================
+
+
+#### - 调用流程
+
+
 ```
 
-更多测试，可以同时解码多路视频。
+jm_nvdec_create_handle()
+jm_nvdec_init()
+
+loop jm_nvdec_is_exit()
+	read_frame_nalu()
+	jm_nvdec_decode_frame()
+	jm_nvdec_output_frame()
+
+end loop
+
+jm_nvdec_show_dec_info()
+
+jm_nvdec_deinit()
+
+```
+
+流程图
+
+![nv_dec](http://www.justinmo.video/media/nv_dec_flow.png)
+	 
+---
+
+
+
+
+
+
+
+#### 4. 测试程序
+- 开发测试平台
+	- OS  : 	Win10
+	- CPU : 	i7-6700 
+	- 集显：	Intel HD Graphics 530
+	- 显卡：	Nvidia GeForce GTX 970
+	- Memory: 16 GB
+
+
+
+
+
+
+
+- test_intel_dec
+
+
+![intel dec](http://www.justinmo.video/media/test_intel_dec.png)
+
+
+- test_nv_dec
+
+
+![nv dec](http://www.justinmo.video/media/test_nv_dec.png)
+
+
+
+
+更多优化测试，目前没有实现更深层的优化。
+
+---
+
+### TODO List
+
+- [x] Intel decode
+- [x] Test intel decode
+- [x] Nvidia decode
+- [x] Test nvdia decode
+- [ ] intel encode
+- [ ] intel transcode
+- [ ] nvidia encode
+- [ ] nvidia transcode
+- [ ] FFmpeg integration
+
