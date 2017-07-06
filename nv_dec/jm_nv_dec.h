@@ -85,4 +85,6 @@ JMDLL_FUNC bool jm_nvdec_is_exit(handle_nvdec handle);
 
 JMDLL_FUNC char* jm_nvdec_show_dec_info(handle_nvdec handle);
 
+JMDLL_FUNC bool jm_nvdec_is_hw_support();
+
 #endif	//_JM_NV_DECODER_H_

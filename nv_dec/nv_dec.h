@@ -61,6 +61,8 @@ typedef struct _nv_frame_buf
 	int			big_buf_len;
 	int			data_len;
 	int			pitch;
+	int			width;
+	int			height;
 }nv_frame_buf;
 
 
@@ -135,6 +137,7 @@ CUVIDPARSERDISPINFO *nvdec_frame_queue_pop(nvdec_ctx *ctx);
 int nvdec_frame_item_release(CUVIDPARSERDISPINFO *info, nvdec_ctx *ctx);
 
 int nvdec_cuda_init(nvdec_ctx *ctx);
+bool nvdec_cuda_hw_support();
 
 int nvdec_decode_packet(uint8_t *in_buf, int in_data_len, nvdec_ctx *ctx);
 int nvdec_decode_output_frame(int *got_frame, nvdec_ctx *ctx);
@@ -144,7 +147,7 @@ nv_frame_buf *nvdec_get_free_frame(nvdec_ctx *ctx);
 int nvdec_create_parser(int codec_type, char *extra_data, int len, nvdec_ctx *ctx);
 int nvdec_create_decoder(CUVIDEOFORMAT* format, nvdec_ctx *ctx);
 
-int nvdec_out_frame_init(uint32_t pitch, uint32_t height, nvdec_ctx *ctx);
+int nvdec_out_frame_init(uint32_t pitch, uint32_t width, uint32_t height, nvdec_ctx *ctx);
 int nvdec_out_frame_deinit(nvdec_ctx *ctx);
 
 void nvdec_set_eof(bool is_eof, nvdec_ctx *ctx);

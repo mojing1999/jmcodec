@@ -185,6 +185,20 @@ int nvdec_frame_item_release(CUVIDPARSERDISPINFO *info, nvdec_ctx *ctx)
 	return 0;
 }
 
+bool nvdec_cuda_hw_support()
+{
+	HINSTANCE	cuda_lib;	// "nvcuda.dll"
+	int dev_count = 0;
+	// load nv library "nvcuda.dll" and init cuda intefaces
+	cuInit(CU_CTX_SCHED_AUTO, __CUDA_API_VERSION, &cuda_lib);
+	cuvidInit(0);
+
+
+	cuDeviceGetCount(&dev_count);
+
+	return (dev_count > 0) ? true : false;
+}
+
 int nvdec_cuda_init(nvdec_ctx *ctx)
 {
 	CUresult cuda_ret = CUDA_SUCCESS;
@@ -424,13 +438,13 @@ int nvdec_decode_output_frame(int *got_frame, nvdec_ctx *ctx)
 		height = ctx->dec_create_info.ulTargetHeight;
 
 		if (ctx->is_first_frame ) {
-			nvdec_out_frame_init(pitch, height, ctx);
+			nvdec_out_frame_init(pitch, width, height, ctx);
 		}
 
 		ctx->cur_out_frame = nvdec_get_free_frame(ctx);
 
 		// Output NV12
-		ctx->cur_out_frame->pitch = pitch;
+		//ctx->cur_out_frame->pitch = pitch;
 		ret = cuMemcpyDtoH(ctx->cur_out_frame->big_buf, mapped_frame, (pitch * height * 3 / 2));
 		ctx->cur_out_frame->data_len = (pitch * height * 3 / 2);
 
@@ -517,7 +531,7 @@ int nvdec_create_decoder(CUVIDEOFORMAT* format, nvdec_ctx *ctx)
 }
 
 // NV output NV12 YUV420
-int nvdec_out_frame_init(uint32_t pitch, uint32_t height, nvdec_ctx *ctx)
+int nvdec_out_frame_init(uint32_t pitch, uint32_t width, uint32_t height, nvdec_ctx *ctx)
 {
 	int ret = 0;
 #define MAX_OUTPUT_FRAMES 1
@@ -536,6 +550,10 @@ int nvdec_out_frame_init(uint32_t pitch, uint32_t height, nvdec_ctx *ctx)
 	for (int i = 0; i < ctx->num_out_frames; i++) {
 		tmp = &ctx->out_frame[i];
 		len = pitch * height * 3 / 2;
+
+		tmp->pitch = pitch;
+		tmp->width = width;
+		tmp->height = height;
 
 		tmp->big_buf_len = len;
 		//tmp->big_buf =  new unsigned char[len];//
@@ -646,7 +664,7 @@ void nvdec_show_info(nvdec_ctx *ctx)
 		"Decode FPS:\t%f fps\n"
 		"==========================================\n",
 		nvdec_get_codec_id_string(ctx),
-		ctx->dec_create_info.ulWidth, ctx->dec_create_info.ulHeight,
+		ctx->dec_create_info.ulTargetWidth, ctx->dec_create_info.ulTargetHeight,
 		ctx->out_fmt == 0 ? "NV12" : "YV12",
 		ctx->num_frames,
 		ctx->elapsed_time,
@@ -723,9 +741,14 @@ JMDLL_FUNC int jm_nvdec_decode_frame(unsigned char *in_buf, int in_data_len, int
 JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handle_nvdec handle)
 {
 	nvdec_ctx *ctx = (nvdec_ctx *)handle;
-	int width	= ctx->dec_create_info.ulWidth;
-	int height	= ctx->dec_create_info.ulHeight;
-	int pitch	= ctx->cur_out_frame->pitch;
+	int width = 0;// ctx->dec_create_info.ulWidth;
+	int height = 0;// ctx->dec_create_info.ulHeight;
+	int pitch = 0;// ctx->cur_out_frame->pitch;
+
+	width = ctx->cur_out_frame->width;
+	height = ctx->cur_out_frame->height;
+	pitch = ctx->cur_out_frame->pitch;
+
 	const unsigned char *py = ctx->cur_out_frame->big_buf;
 	const unsigned char *puv = ctx->cur_out_frame->big_buf + pitch * height;
 	unsigned char *pdst = out_buf;	// out put YUV NV12 buffer
@@ -741,9 +764,18 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 
 	if (0 == ctx->out_fmt) {
 		// NV12
-		for (y = 0; y < height * 3 / 2; y++) {
+		// luma
+		for (y = 0; y < height; y++) {
 			memcpy(&pdst[y*width], py, width);
 			py += pitch;
+		}
+		// chroma
+		w2 = width;// >> 1;
+		h2 = height >> 1;
+		int uv_offset = w2 * h2;
+		for (y = 0; y < h2; y++) {
+			memcpy(&pdst[xy_offset + y*w2], puv, w2);
+			puv += pitch;
 		}
 	}
 	else {
@@ -757,6 +789,7 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 		// chroma
 		w2 = width >> 1;
 		h2 = height >> 1;
+		//pitch = pitch >> 1;
 		int uv_offset = w2 * h2;
 
 		for (y = 0; y < h2; y++) {
@@ -772,6 +805,7 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 
 	//memcpy(out_buf, ctx->cur_out_frame->big_buf, ctx->cur_out_frame->data_len);
 	*out_len = width * height * 3 / 2;
+	//*out_len = width * height;
 
 	return *out_len;
 }
@@ -787,8 +821,8 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 JMDLL_FUNC int jm_nvdec_stream_info(int *disp_width, int *disp_height, handle_nvdec handle)
 {
 	nvdec_ctx *ctx = (nvdec_ctx *)handle;
-	*disp_width = ctx->dec_create_info.ulWidth;
-	*disp_height = ctx->dec_create_info.ulHeight;
+	*disp_width = ctx->dec_create_info.ulTargetWidth;
+	*disp_height = ctx->dec_create_info.ulTargetHeight;
 
 	return 0;
 }
@@ -807,4 +841,13 @@ JMDLL_FUNC bool jm_nvdec_is_exit(handle_nvdec handle)
 JMDLL_FUNC char* jm_nvdec_show_dec_info(handle_nvdec handle)
 {
 	return ((nvdec_ctx *)handle)->dec_info;
+}
+
+JMDLL_FUNC bool jm_nvdec_is_hw_support()
+{
+	bool ret = true;
+
+	ret = nvdec_cuda_hw_support();
+
+	return ret;
 }

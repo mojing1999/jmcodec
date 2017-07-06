@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <time.h>
+#include <conio.h>
 #include "jm_nv_dec.h"
 
 #pragma warning(disable : 4996)
@@ -84,6 +85,16 @@ unsigned char *find_nalu(unsigned char *buf, int size, int *nalu_len)
 	return p;
 }
 
+bool is_user_exit()
+{
+	if (_kbhit()) {
+		if ('q' == getch())
+			return true;
+	}
+
+	return false;
+}
+
 int main(int argc, char **argv)
 {
 	handle_nvdec dec_handle;
@@ -98,10 +109,14 @@ int main(int argc, char **argv)
 	in_buf = new unsigned char[in_len];
 	out_buf = new unsigned char[out_len];
 
+	char *in_file = argv[1];
 
 	//ifile = fopen("f:\\justin_zcam2.264", "rb");
-	ifile = fopen("f:\\4.track_2.264", "rb");
-	ofile = fopen("f:\\4.track_2.264.yuv", "wb");
+	ifile = fopen("f:\\test\\taeyeon-1920x1080_2.h264", "rb");
+	//ifile = fopen("F:\\qqyun\\arm_demo_day_4K_4mbps.track_1.264", "rb");
+	//ifile = fopen("F:\\test\\taeyeon-1920x1080_2.h264", "rb");
+	//ifile = fopen(in_file, "rb");
+	ofile = fopen("f:\\taeyeon-1920x1080_2.h264.yuv", "wb");
 	//ofile = fopen("f:\\justin_zcam2.264.yuv", "wb");
 
 	int ret = 0;
@@ -145,6 +160,8 @@ int main(int argc, char **argv)
 
 #endif
 
+	bool is_nv_support = jm_nvdec_is_hw_support();
+
 	dec_handle = jm_nvdec_create_handle();
 	 
 	jm_nvdec_init(0, 1, NULL, 0, dec_handle);
@@ -164,7 +181,7 @@ int main(int argc, char **argv)
 
 	long nalu_count = 0;
 
-	while (!jm_nvdec_is_exit(dec_handle)) {
+	while (!is_user_exit() && (!jm_nvdec_is_exit(dec_handle))) {
 		if (0 == is_eof) {
 			nalu = find_nalu(buf, buf_len, &nalu_len);
 

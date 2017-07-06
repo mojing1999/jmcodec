@@ -89,7 +89,9 @@ JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle);
  *
  *   @return: return char * 
  */
-JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle);
+JMDLL_FUNC char *jm_intel_dec_info(handle_inteldec handle);
+
+JMDLL_FUNC int jm_intel_get_stream_info(int *width, int *height, float *frame_rate, handle_inteldec handle);
 
 /**
  *   @desc:  check whether decode need more input data.
@@ -114,5 +116,8 @@ JMDLL_FUNC int jm_intel_dec_free_buf_len(handle_inteldec handle);
  *   @return: return true if decode exit, else return false.
  */
 JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle);
+
+
+JMDLL_FUNC bool jm_intel_is_hw_support();
 
 #endif	//_JM_INTEL_DECODER_H_

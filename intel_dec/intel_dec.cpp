@@ -39,22 +39,22 @@ DWORD WINAPI decode_thread_proc(LPVOID param)
 
 		if(!ctx->is_param_inited) {
 			// decode header
-			LOG("decode header...\n");
 			dec_decode_header(ctx);
 		}
 		else {
 			// decode packet
-			LOG("decode packet...\n");
 			dec_decode_packet(ctx);
 		}
 		Sleep(1);
 
-	} while (!ctx->is_eof || 0 != dec_get_input_data_len(ctx));
+	} while (!ctx->is_exit && (!ctx->is_eof || 0 != dec_get_input_data_len(ctx)));	// user exit, set is_exit=true direct exit
 
 	LOG("output decode cached frame...\n");
-	// output decoder cached frame
-	dec_handle_cached_frame(ctx);
-
+	
+	if (0 == ctx->is_eof) {
+		// output decoder cached frame
+		dec_handle_cached_frame(ctx);
+	}
 	// has been decoded all frame, exit.
 	ctx->elapsed_time = clock() - ctx->elapsed_time;
 
@@ -101,6 +101,7 @@ int intel_dec_init(int codec_type, int out_fmt, intel_ctx *ctx)
 
 	// 
 	ctx->hw_try = 1;	// try hardware decode first
+	ctx->out_fmt = out_fmt;
 
 	// init bitstream
 	// init mutex
@@ -138,9 +139,27 @@ int intel_dec_deinit(intel_ctx *ctx)
 
 	LOG("intel decode deinit...\n");
 	// TODO:
-	ctx->is_eof = 1;
+
+	if (0 == ctx->is_eof) {
+		// user direct exit
+		ctx->is_eof = 1;
+		ctx->is_exit = true;
+
+		if (ctx->event_yuv) {
+			SetEvent(ctx->event_yuv);
+			CloseHandle(ctx->event_yuv);
+			ctx->event_yuv = 0;
+		}
+
+	}
+
 	dec_wait_thread_exit(ctx);
+
 	// in_bs
+	if (ctx->mutex_input) {
+		CloseHandle(ctx->mutex_input);
+		ctx->mutex_input = 0;
+	}
 	if (ctx->in_bs) {
 		if (ctx->in_bs->Data)
 			delete[] ctx->in_bs->Data;
@@ -238,8 +257,8 @@ int intel_dec_output_yuv_frame(uint8_t *out_buf, int *out_len, intel_ctx *ctx)
 	mfxFrameInfo *info = NULL;
 
 	info = &ctx->param->mfx.FrameInfo;
-	int width = info->CropW;
-	int height = info->CropH;
+	int width = info->Width;//info->CropW;
+	int height = info->Height;	// info->CropH;
 
 	int data_len = 0;
 	// output YUV420
@@ -567,10 +586,12 @@ int dec_deinit_yuv_output(intel_ctx *ctx)
 
 	if (ctx->event_yuv) {
 		CloseHandle(ctx->event_yuv);
+		ctx->event_yuv = 0;
 	}
 
 	if (ctx->mutex_yuv) {
 		CloseHandle(ctx->mutex_yuv);
+		ctx->mutex_yuv = 0;
 	}
 
 	for (i = 0; i < ctx->num_yuv; i++) {
@@ -689,13 +710,13 @@ int dec_conver_surface_to_bistream(mfxFrameSurface1 *surface, intel_ctx *ctx)
 
 	if (NULL == frame_bs) {
 		// waiting for output yuv release yuv bitstream
-		//LOG("--- Before ResetEvent()\n");
+		LOG("--- Before ResetEvent()\n");
 		ResetEvent(ctx->event_yuv);
 		ctx->is_waiting = 1;
 		WaitForSingleObject(ctx->event_yuv, INFINITE); 
 		ctx->is_waiting = 0;
 		frame_bs = dec_get_free_yuv_bitstream(ctx);
-		//LOG("--- After WaitForSingleObject(), frame_bs = %p\n", frame_bs);
+		LOG("--- After WaitForSingleObject(), frame_bs = %p\n", frame_bs);
 
 		if (NULL == frame_bs) {
 			return -1;
@@ -805,7 +826,7 @@ mfxStatus dec_handle_cached_frame(intel_ctx *ctx)
 
 	int index = 0;
 	// retrieve the buffered decoded frames
-	while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts)	{
+	while(!ctx->is_exit && (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts))	{
 		if (MFX_WRN_DEVICE_BUSY == sts) {
 			// Wait if devices is busy, then repeat the same call to DecodeFrameAsync
 			MSDK_SLEEP(1);
@@ -852,7 +873,7 @@ mfxStatus dec_decode_packet(intel_ctx *ctx)
     mfxSyncPoint syncp;
     mfxFrameSurface1* surface_out = NULL;
 
-	while(MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts || MFX_ERR_MORE_SURFACE == sts) {
+	while(!ctx->is_exit && (MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts || MFX_ERR_MORE_SURFACE == sts)) {
 		if(MFX_WRN_DEVICE_BUSY == sts) {
 			// waiting
 			MSDK_SLEEP(1);
@@ -942,6 +963,44 @@ mfxStatus dec_decode_header(intel_ctx *ctx)
 	return sts;
 }
 
+int dec_get_stream_info(int *width, int *height, float *frame_rate, intel_ctx *ctx)
+{
+	mfxFrameInfo *info = NULL;
+	*width = 0;
+	*height = 0;
+	*frame_rate = 0.0;
+
+	if (!ctx->is_param_inited) {
+		return -1;
+	}
+
+	info = &ctx->param->mfx.FrameInfo;
+	*width = info->Width;//info->CropW;
+	*height = info->Height;	// info->CropH;
+
+	*frame_rate = (float)info->FrameRateExtD / (float)info->FrameRateExtD;
+		
+	return 0;
+
+}
+
+bool intel_dec_is_hw_support()
+{
+	mfxStatus sts = MFX_ERR_NONE;
+	mfxVersion ver = { 1, 1 };
+	mfxSession session;
+
+	mfxIMPL impl = MFX_IMPL_HARDWARE_ANY;
+	sts = MFXInit(impl, &ver, &session);
+	if (MFX_ERR_NONE != sts) {
+		impl = MFX_IMPL_HARDWARE;
+		sts = MFXInit(impl, &ver, &session);
+	}
+
+
+	return (MFX_ERR_NONE == sts) ? true : false;
+}
+
 
 /****************************************************************************************
  *		output interfaces
@@ -1021,11 +1080,16 @@ JMDLL_FUNC int jm_intel_dec_set_eof(int is_eof, handle_inteldec handle)
  *
  *   @return: return char *
  */
-JMDLL_FUNC char *jm_intel_dec_stream_info(handle_inteldec handle)
+JMDLL_FUNC char *jm_intel_dec_info(handle_inteldec handle)
 {
 	intel_ctx *ctx = (intel_ctx *)handle;
 
 	return ctx->dec_info;
+}
+
+JMDLL_FUNC int jm_intel_get_stream_info(int *width, int *height, float *frame_rate, handle_inteldec handle)
+{
+	return dec_get_stream_info(width, height, frame_rate, (intel_ctx *)handle);
 }
 
 JMDLL_FUNC bool jm_intel_dec_need_more_data(handle_inteldec handle)
@@ -1046,4 +1110,9 @@ JMDLL_FUNC int jm_intel_dec_set_yuv_callback(void *user_data, HANDLE_YUV_CALLBAC
 JMDLL_FUNC bool jm_intel_dec_is_exit(handle_inteldec handle)
 {
 	return intel_dec_is_exit((intel_ctx *)handle);
+}
+
+JMDLL_FUNC bool jm_intel_is_hw_support()
+{
+	return intel_dec_is_hw_support();
 }

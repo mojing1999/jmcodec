@@ -9,7 +9,11 @@
 *  Desc:       This sample code test intel_dec library
 *****************************************************************************/
 #include <stdio.h>
+#include <conio.h>
+
 #include "jm_intel_dec.h"
+
+
 #pragma warning(disable : 4996)
 
 #pragma comment(lib,"intel_dec.lib")
@@ -22,6 +26,16 @@ int save_yuv_frame(unsigned char *out_buf, int out_len, void *user_data)
 	return 0;
 }
 
+bool is_user_exit()
+{
+	if (_kbhit()) {
+		if ('q' == getch())
+			return true;
+	}
+
+	return false;
+}
+
 int main(int argc, char **argv)
 {
 	handle_inteldec dec_handle;
@@ -32,17 +46,20 @@ int main(int argc, char **argv)
 	int in_len = 0, out_len = 0;
 
 	in_len = (10 << 20);	// 2 MB
-	out_len = (10 << 20);	// 10 MB
+	out_len = (20 << 20);	// 20 MB
 	in_buf = new unsigned char[in_len];
 	out_buf = new unsigned char[out_len];
 
-
-	ifile = fopen("f:\\justin_zcam2.264", "rb");
+	char *in_file = argv[1];
+	//ifile = fopen("f:\\test\\arm_demo_day_4K.264", "rb");
+	ifile = fopen(in_file, "rb");
+	//ifile = fopen("F:\\qqyun\\arm_demo_day_4K_4mbps.track_1.264", "rb");
 	//C:\Users\justin\Downloads\Temp
 	///ofile = fopen("f://justin_zcam2.264.yuv", "wb");
-	ofile = fopen("f:\\justin_zcam2.264.yuv", "wb");
+	ofile = fopen("F:\\test.264.yuv", "wb");
 
 
+	bool is_hw_support = jm_intel_is_hw_support();
 
 	dec_handle = jm_intel_dec_create_handle();
 
@@ -56,7 +73,7 @@ int main(int argc, char **argv)
 	int yuv_len = 0;
 	int is_eof = 0;
 
-	while (!jm_intel_dec_is_exit(dec_handle)) {
+	while (!jm_intel_dec_is_exit(dec_handle) && !is_user_exit()) {
 		if (jm_intel_dec_need_more_data(dec_handle) && 0 == is_eof) {
 			remaining_len = jm_intel_dec_free_buf_len(dec_handle);
 			read_len = fread(in_buf, 1, remaining_len, ifile);
@@ -72,14 +89,14 @@ int main(int argc, char **argv)
 
 		ret = jm_intel_dec_output_frame(out_buf, &yuv_len, dec_handle);
 		if (0 == ret/* && yuv_len > 0*/) {
-			write_len = fwrite(out_buf, 1, yuv_len, ofile);
+			//write_len = fwrite(out_buf, 1, yuv_len, ofile);
 		}
 
 
 	}
 
 
-	printf(jm_intel_dec_stream_info(dec_handle));
+	printf(jm_intel_dec_info(dec_handle));
 
 	jm_intel_dec_deinit(dec_handle);
 

@@ -138,6 +138,7 @@ mfxStatus dec_handle_cached_frame(intel_ctx *ctx);
 mfxStatus dec_decode_packet(intel_ctx *ctx);
 mfxStatus dec_decode_header(intel_ctx *ctx);
 
+int dec_get_stream_info(int *width, int *height, float frame_rate, intel_ctx *ctx);
 
-
+bool intel_dec_is_hw_support();
 #endif	// _INTEL_DECODER_H_
