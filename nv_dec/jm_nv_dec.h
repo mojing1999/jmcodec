@@ -11,7 +11,7 @@
 #ifndef _JM_NV_DECODER_H_
 #define _JM_NV_DECODER_H_
 
-#ifndef PISOFTDLL_FUNC
+#ifndef JMDLL_FUNC
 #define JMDLL_FUNC		_declspec(dllexport)
 #define JMDLL_API		__stdcall
 #endif

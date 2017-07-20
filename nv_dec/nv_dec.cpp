@@ -411,6 +411,10 @@ int nvdec_decode_output_frame(int *got_frame, nvdec_ctx *ctx)
 	CUdeviceptr mapped_frame = 0;
 	*got_frame = 0;
 
+	if (!ctx->cudecoder) {
+		// error, can not create hw decode
+		return -1;
+	}
 
 	disp_info = nvdec_frame_queue_pop(ctx);
 
@@ -513,6 +517,11 @@ int nvdec_create_decoder(CUVIDEOFORMAT* format, nvdec_ctx *ctx)
 	cuinfo->display_area.top = 0;
 	cuinfo->display_area.right = (short)cuinfo->ulTargetWidth;
 	cuinfo->display_area.bottom = (short)cuinfo->ulTargetHeight;
+
+	cuinfo->target_rect.left = 0;
+	cuinfo->target_rect.top = 0;
+	cuinfo->target_rect.right = cuinfo->ulWidth;
+	cuinfo->target_rect.bottom = cuinfo->ulHeight;
 
 	cuinfo->ulNumDecodeSurfaces = NVDEC_MAX_FRAMES;
 	cuinfo->ulNumOutputSurfaces = 1;
@@ -745,6 +754,9 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 	int height = 0;// ctx->dec_create_info.ulHeight;
 	int pitch = 0;// ctx->cur_out_frame->pitch;
 
+	if (!ctx->cur_out_frame)
+		return -1;
+
 	width = ctx->cur_out_frame->width;
 	height = ctx->cur_out_frame->height;
 	pitch = ctx->cur_out_frame->pitch;
@@ -753,8 +765,13 @@ JMDLL_FUNC int jm_nvdec_output_frame(unsigned char *out_buf, int *out_len, handl
 	const unsigned char *puv = ctx->cur_out_frame->big_buf + pitch * height;
 	unsigned char *pdst = out_buf;	// out put YUV NV12 buffer
 
-	if (*out_len < (width * height * 3 / 2))
+	if (!py) {
+		// no output yuv data
 		return -1;
+	}
+
+	if (*out_len < (width * height * 3 / 2))
+		return -2;
 
 	*out_len = 0;
 
