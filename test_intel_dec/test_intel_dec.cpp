@@ -10,6 +10,7 @@
 *****************************************************************************/
 #include <stdio.h>
 #include <conio.h>
+#include <Windows.h>
 
 #include "jm_intel_dec.h"
 
@@ -51,7 +52,8 @@ int main(int argc, char **argv)
 	out_buf = new unsigned char[out_len];
 
 	char *in_file = argv[1];
-	//ifile = fopen("f:\\test\\arm_demo_day_4K.264", "rb");
+	//ifile = fopen("f:\\test\\v-1920x960.h264", "rb");
+	//ifile = fopen("f:\\ZCAM02.track_1.264", "rb");
 	ifile = fopen(in_file, "rb");
 	//ifile = fopen("F:\\qqyun\\arm_demo_day_4K_4mbps.track_1.264", "rb");
 	//C:\Users\justin\Downloads\Temp
@@ -87,6 +89,7 @@ int main(int argc, char **argv)
 			}
 		}
 
+		yuv_len = out_len;
 		ret = jm_intel_dec_output_frame(out_buf, &yuv_len, dec_handle);
 		if (0 == ret/* && yuv_len > 0*/) {
 			//write_len = fwrite(out_buf, 1, yuv_len, ofile);

@@ -19,13 +19,6 @@
 
 #pragma comment(lib,"intel_enc.lib")
 
-int save_yuv_frame(unsigned char *out_buf, int out_len, void *user_data)
-{
-	FILE *ofile = (FILE*)user_data;
-	fwrite(out_buf, 1, out_len, ofile);
-
-	return 0;
-}
 
 bool is_user_exit()
 {
@@ -57,7 +50,7 @@ int main(int argc, char **argv)
 	//ifile = fopen("F:\\qqyun\\arm_demo_day_4K_4mbps.track_1.264", "rb");
 	//C:\Users\justin\Downloads\Temp
 	///ofile = fopen("f://justin_zcam2.264.yuv", "wb");
-	ofile = fopen("F:\\test_intel_enc.mpg", "wb");
+	ofile = fopen("F:\\test_intel_enc.h264", "wb");
 
 	int width = 1920;
 	int height = 960;
