@@ -15,7 +15,8 @@
 #include <time.h>
 
 
-#pragma comment(lib,"libmfx.lib")
+#pragma comment(lib,"libmfx.lib")	// MT
+//#pragma comment(lib,"libmfx_vs2015.lib")	// MD
 #pragma comment(lib,"legacy_stdio_definitions.lib")
 
 #define MSDK_SLEEP(X)                   { Sleep(X); }
@@ -23,7 +24,9 @@
 #define MSDK_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {return ERR;}}
 #define MSDK_IGNORE_MFX_STS(P, X)       {if ((X) == (P)) {P = MFX_ERR_NONE;}}
 
-#define MAX_INPUT_BITSTREAM_SIZE		(5*1024*1024)
+#define MAX_INPUT_BITSTREAM_SIZE		(10*1024*1024)
+#define FREE_BUF_FOR_MORE_DATA			(5*1024 * 1024)
+#define MUX_OFFSET_FOR_INPUT_BITSTREAM	(4*1024*1024)
 //#define MAX_OUTPUT_YUV_COUNT			20	
 #define NUM_SURFACE_ADDITION			30
 #define MUTEXT_NAME_YUV					("intel_output_yuv")
@@ -31,8 +34,6 @@
 #define EVENT_NAME_YUV					("intel_yuv_evt")
 #define SYNC_WAITING_TIME				(60000)        	
 #define INTEL_DEC_ASYNC_DEPTH			4	
-#define FREE_BUF_FOR_MORE_DATA			(2*1024 * 1024)
-#define MUX_OFFSET_FOR_INPUT_BITSTREAM	(1*1024*1024)
 
 #define INDEX_OF_RESERVED_IN_USE 		0
 
@@ -185,7 +186,7 @@ int intel_dec_deinit(intel_ctx *ctx)
 /*
  *	@desc: put data to decode buffer.
  */
-int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx)
+int intel_dec_put_input_data(const uint8_t *data, const int len, intel_ctx *ctx)
 {
 	int ret = 0;
 	mfxBitstream *pbs = NULL;
@@ -208,7 +209,7 @@ int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx)
 			new_size = pbs->MaxLength + len;
 		}
 		else {
-			new_size = pbs->MaxLength * 2;
+			new_size = pbs->MaxLength + len * 2;
 		}
 		dec_extend_bitstream(new_size, pbs);
 	}
@@ -986,7 +987,7 @@ int dec_get_stream_info(int *width, int *height, float *frame_rate, intel_ctx *c
 	*width = info->Width;//info->CropW;
 	*height = info->Height;	// info->CropH;
 
-	*frame_rate = (float)info->FrameRateExtD / (float)info->FrameRateExtD;
+	*frame_rate = (float)info->FrameRateExtN / (float)info->FrameRateExtD;
 		
 	return 0;
 

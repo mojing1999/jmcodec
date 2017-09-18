@@ -127,7 +127,6 @@ int intel_enc_deinit(intel_enc_ctx *ctx)
 
 	enc_plugin_unload(ctx);
 
-	MFXVideoENCODE_Close(ctx->session);
 
 
 	// deinit surfaces
@@ -142,11 +141,24 @@ int intel_enc_deinit(intel_enc_ctx *ctx)
 	}
 
 	if (ctx->enc_param) {
+		if (ctx->enc_param->ExtParam) {
+			for (int i = 0; i < ctx->enc_param->NumExtParam; i++) {
+				delete ctx->enc_param->ExtParam[i];
+			}
+
+			delete[] ctx->enc_param->ExtParam;
+		}
 		delete ctx->enc_param;
 	}
 
 
+	if (ctx->sps_pps_buffer) {
+		delete[] ctx->sps_pps_buffer;
+		ctx->sps_pps_buffer = NULL;
+	}
+	
 	// close enc
+	MFXVideoENCODE_Close(ctx->session);
 
 	return 0;
 }
@@ -301,7 +313,80 @@ int intel_enc_input_yuv_frame(uint8_t *yuv, int len, intel_enc_ctx *ctx)
 	return 0;
 }
 
-int intel_enc_output_bitstream(uint8_t *out_buf, int *out_len, intel_enc_ctx *ctx)
+int intel_enc_input_yuv_yuv420(uint8_t *yuv, int len, intel_enc_ctx *ctx)
+{
+	// get free surface
+	int index = enc_get_free_surface_index(ctx);
+	if (MFX_ERR_NOT_FOUND == index) {
+		// Error
+		LOG("Error: ----------no free surface\n");
+		return -1;
+	}
+
+	// copy yuv data to surface
+	mfxFrameSurface1 *surf = ctx->surfaces[index];
+	mfxFrameInfo *info = &surf->Info;
+	mfxFrameData *data = &surf->Data;
+	uint16_t w = 0, h = 0, pitch = 0;
+	int y_len = 0, uv_len = 0;
+	int crop_x = 0, crop_y = 0;
+	int i = 0;
+
+
+	if (info->CropW > 0 && info->CropH > 0) {
+		w = info->CropW;
+		h = info->CropH;
+	}
+	else {
+		w = info->Width;
+		h = info->Height;
+	}
+
+	y_len = w * h;
+	uv_len = y_len / 2;
+
+	crop_x = info->CropX;
+	crop_y = info->CropY;
+	pitch = data->Pitch;
+
+	mfxU8 *dst = data->Y;
+	uint8_t *src = yuv;
+
+	// Y
+	for (i = 0; i < h; i++) {
+		dst = data->Y + (crop_y * pitch + crop_x) + i * pitch;
+		src = yuv + i * w;
+		memcpy(dst, src, w);
+	}
+
+	// UV
+	crop_x /= 2;
+	crop_y /= 2;
+	h /= 2;
+	w /= 2;
+
+	src = yuv + y_len;
+	uint8_t *pu = src;
+	uint8_t *pv = src + w * h;
+	dst = data->UV + crop_x + crop_y * pitch;
+	int index_uv = 0;
+	int j = 0;
+
+	for (i = 0; i < h; i++) {
+		for (j = 0; j < 2 * w; j += 2) {
+			dst[i*pitch + j] = pu[index_uv];
+			dst[i*pitch + j + 1] = pv[index_uv++];
+		}
+	}
+
+
+	// put surface to queue
+	enc_push_yuv_surface(surf, ctx);
+
+	return 0;
+}
+
+int intel_enc_output_bitstream(uint8_t *out_buf, int *out_len, int *is_keyframe, intel_enc_ctx *ctx)
 {
 	mfxBitstream *bs = enc_pop_bitstream(ctx);
 	int len = 0;
@@ -318,6 +403,7 @@ int intel_enc_output_bitstream(uint8_t *out_buf, int *out_len, intel_enc_ctx *ct
 
 		memcpy(out_buf, bs->Data, len);
 		*out_len = len;
+		*is_keyframe = ((bs->FrameType & MFX_FRAMETYPE_I) || (bs->FrameType & MFX_FRAMETYPE_IDR));
 
 		// Release bitstream
 		enc_release_bitstream(bs);
@@ -442,10 +528,95 @@ mfxStatus enc_param_init(intel_enc_ctx *ctx)
 	enc->IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
 
+	//
+	//
+	enc->mfx.GopRefDist = 1;	// Distance between I- or P- key framesIf GopRefDist = 1, there are no B frames used. 
+	enc->mfx.NumRefFrame = 0;
+
+	enc->mfx.GopOptFlag = MFX_GOP_CLOSED;
+	enc->mfx.IdrInterval = 0;
+	enc->mfx.GopPicSize = 30;
+
+	// ext param
+	mfxExtCodingOption *option = new mfxExtCodingOption;
+	memset(option, 0x0, sizeof(mfxExtCodingOption));
+	option->Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
+	option->Header.BufferSz = sizeof(mfxExtCodingOption);
+	option->ViewOutput = MFX_CODINGOPTION_ON;
+	option->AUDelimiter = MFX_CODINGOPTION_OFF;
+	option->RefPicMarkRep = MFX_CODINGOPTION_ON;
+	option->PicTimingSEI = MFX_CODINGOPTION_OFF;
+	option->SingleSeiNalUnit = MFX_CODINGOPTION_OFF;
+	option->ResetRefList = MFX_CODINGOPTION_ON;
+
+	//
+	mfxExtCodingOption2 *option2 = new mfxExtCodingOption2;
+	memset(option2, 0x0, sizeof(mfxExtCodingOption2));
+	option2->Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+	option2->Header.BufferSz = sizeof(mfxExtCodingOption2);
+	option2->RepeatPPS = MFX_CODINGOPTION_OFF;
+
+
+	mfxExtBuffer** ExtBuffer = new mfxExtBuffer *[2];
+	ExtBuffer[0] = (mfxExtBuffer*)option2;
+	ExtBuffer[1] = (mfxExtBuffer*)option;
+	enc->ExtParam = (mfxExtBuffer**)&ExtBuffer[0];// option;
+	enc->NumExtParam = 2;
+
+
+
+
+
+
+
+	//
+
 	sts = MFXVideoENCODE_Query(ctx->session, enc, enc);
 	MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
 	MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
+
+	return sts;
+}
+
+mfxStatus enc_get_spspps(intel_enc_ctx *ctx)
+{
+	mfxStatus sts = MFX_ERR_NONE;
+#define BUFFER_SIZE_SPSPPS		512
+	mfxU8 sps[BUFFER_SIZE_SPSPPS] = { 0 };
+	mfxU8 pps[BUFFER_SIZE_SPSPPS] = { 0 };
+
+	mfxExtCodingOptionSPSPPS extSPSPPS;
+	memset(&extSPSPPS, 0x0, sizeof(mfxExtCodingOptionSPSPPS));
+	extSPSPPS.Header.BufferId = MFX_EXTBUFF_CODING_OPTION_SPSPPS;
+	extSPSPPS.Header.BufferSz = sizeof(mfxExtCodingOptionSPSPPS);
+	extSPSPPS.PPSBufSize = BUFFER_SIZE_SPSPPS;
+	extSPSPPS.SPSBufSize = BUFFER_SIZE_SPSPPS;
+	extSPSPPS.PPSBuffer = pps;
+	extSPSPPS.SPSBuffer = sps;
+
+	mfxExtBuffer* encExtParams[1];
+	mfxVideoParam par = {};
+
+	encExtParams[0] = (mfxExtBuffer *)&extSPSPPS;
+	par.ExtParam = &encExtParams[0];
+	par.NumExtParam = 1;
+
+	sts = MFXVideoENCODE_GetVideoParam(ctx->session, &par);
+
+	LOG("get video encode sps pps, sts = %d\n", sts);
+	if (MFX_ERR_NONE == sts) {
+		ctx->len_sps = extSPSPPS.SPSBufSize;
+		ctx->len_pps = extSPSPPS.PPSBufSize;
+
+		if (ctx->sps_pps_buffer == NULL) {
+			ctx->sps_pps_buffer = new mfxU8[ctx->len_sps + ctx->len_pps];
+			memset(ctx->sps_pps_buffer, 0x0, ctx->len_sps + ctx->len_pps);
+			memcpy(ctx->sps_pps_buffer, extSPSPPS.SPSBuffer, extSPSPPS.SPSBufSize);
+			memcpy(ctx->sps_pps_buffer + extSPSPPS.SPSBufSize, extSPSPPS.PPSBuffer, extSPSPPS.PPSBufSize);
+			LOG("Get video encode SPS PPS data, len = %d\n", ctx->len_sps + ctx->len_pps);
+		}
+	}
 
 	return sts;
 }
@@ -545,9 +716,8 @@ int enc_get_free_surface_index(intel_enc_ctx *ctx)
 {
 	if (ctx->surfaces) {
 		for (int i = 0; i < ctx->num_surfaces; i++) {
-			if (0 == ctx->surfaces[i]->Data.Locked && 0 == ctx->surfaces[i]->reserved[SURFACE_IN_USE]/*false == ctx->in_use[i]*/) {
-				//ctx->in_use[i] = true;
-				ctx->surfaces[i]->reserved[SURFACE_IN_USE] = 1;
+			if (0 == ctx->surfaces[i]->Data.Locked && 0 == ctx->surfaces[i]->reserved[INDEX_OF_RESERVED_IN_USE]) {
+				enc_surface_enquue_mark(ctx->surfaces[i]);
 				return i;
 			}
 		}
@@ -555,6 +725,17 @@ int enc_get_free_surface_index(intel_enc_ctx *ctx)
 
 	return MFX_ERR_NOT_FOUND;
 }
+
+void enc_surface_enquue_mark(mfxFrameSurface1 *surface)
+{
+	surface->reserved[INDEX_OF_RESERVED_IN_USE] = 1;
+}
+
+void enc_surface_dequeue_mark(mfxFrameSurface1 *surface)
+{
+	surface->reserved[INDEX_OF_RESERVED_IN_USE] = 0;
+}
+
 
 int enc_push_yuv_surface(mfxFrameSurface1 *surf, intel_enc_ctx *ctx)
 {
@@ -755,7 +936,8 @@ mfxStatus enc_encode_frame(intel_enc_ctx *ctx)
 		// Release YUV surface in queue
 		LOG("enc_encode_frame() sts = %d\n", sts);
 		if (surface) {
-			surface->reserved[SURFACE_IN_USE] = 0;
+			//surface->reserved[SURFACE_IN_USE] = 0;
+			enc_surface_dequeue_mark(surface);
 		}
 
 		if (MFX_ERR_NONE == sts) {
@@ -1011,9 +1193,14 @@ JMDLL_FUNC int jm_intel_enc_encode_yuv_frame(unsigned char *yuv, int len, handle
 	return intel_enc_input_yuv_frame(yuv, len, (intel_enc_ctx *)handle);
 }
 
-JMDLL_FUNC int jm_intel_enc_output_bitstream(unsigned char *out_buf, int *out_len, handle_intelenc handle)
+JMDLL_FUNC int jm_intel_enc_encode_yuv_yuv420(unsigned char *yuv, int len, handle_intelenc handle)
 {
-	return intel_enc_output_bitstream(out_buf, out_len, (intel_enc_ctx *)handle);
+	return intel_enc_input_yuv_yuv420(yuv, len, (intel_enc_ctx *)handle);
+}
+
+JMDLL_FUNC int jm_intel_enc_output_bitstream(unsigned char *out_buf, int *out_len, int *is_keyframe, handle_intelenc handle)
+{
+	return intel_enc_output_bitstream(out_buf, out_len, is_keyframe, (intel_enc_ctx *)handle);
 }
 
 JMDLL_FUNC int jm_intel_enc_set_eof(handle_intelenc handle)
@@ -1034,4 +1221,17 @@ JMDLL_FUNC bool jm_intel_enc_more_data(handle_intelenc handle)
 JMDLL_FUNC char *jm_intel_enc_info(handle_intelenc handle)
 {
 	return ((intel_enc_ctx *)handle)->enc_info;
+}
+
+JMDLL_FUNC  char * jm_intel_enc_get_spspps(int *sps_len, int *pps_len, handle_intelenc handle)
+{
+	intel_enc_ctx * ctx = (intel_enc_ctx *)handle;
+	if (!ctx->sps_pps_buffer) {
+		enc_get_spspps(ctx);
+	}
+
+	*sps_len = ctx->len_sps;
+	*pps_len = ctx->len_pps;
+
+	return (char *)ctx->sps_pps_buffer;
 }

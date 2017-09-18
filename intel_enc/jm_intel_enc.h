@@ -59,7 +59,9 @@ JMDLL_FUNC int jm_intel_enc_init(intel_enc_param *in_param, handle_intelenc hand
 JMDLL_FUNC int jm_intel_enc_deinit(handle_intelenc handle);
 
 JMDLL_FUNC int jm_intel_enc_encode_yuv_frame(unsigned char *yuv, int len, handle_intelenc handle);
-JMDLL_FUNC int jm_intel_enc_output_bitstream(unsigned char *out_buf, int *out_len, handle_intelenc handle);
+JMDLL_FUNC int jm_intel_enc_encode_yuv_yuv420(unsigned char *yuv, int len, handle_intelenc handle);
+
+JMDLL_FUNC int jm_intel_enc_output_bitstream(unsigned char *out_buf, int *out_len, int *is_keyframe, handle_intelenc handle);
 
 JMDLL_FUNC int jm_intel_enc_set_eof(handle_intelenc handle);
 JMDLL_FUNC bool jm_intel_enc_is_exit(handle_intelenc handle);
@@ -67,5 +69,8 @@ JMDLL_FUNC bool jm_intel_enc_is_exit(handle_intelenc handle);
 JMDLL_FUNC bool jm_intel_enc_more_data(handle_intelenc handle);
 
 JMDLL_FUNC char *jm_intel_enc_info(handle_intelenc handle);
+
+JMDLL_FUNC  char * jm_intel_enc_get_spspps(int *sps_len, int *pps_len, handle_intelenc handle);
+
 
 #endif	//_JM_INTEL_ENCODER_H_

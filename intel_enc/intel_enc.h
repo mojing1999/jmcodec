@@ -39,13 +39,14 @@
 #define INTEL_ENC_DEFAULT_HEIGHT (1080)
 #define INTEL_ENC_DEFAULT_BITRATE (2000)
 #define MAX_OUTPUT_BS_COUNT	(30)
-#define DEFAULT_OUTPUT_BS_SIZE (1024*1024)
+#define DEFAULT_OUTPUT_BS_SIZE (3*1024*1024)
 #define MUTEX_NAME_OUTPUT_BS	("mutex_intel_enc_out_bs")
 #define MUTEX_NAME_INPUT_YUV	("mutex_intel_enc_in_yuv")
 #define NUM_SURFACE_ADDITION	(30)
 
 #define MAX_TIME_ENC_EYNCP	(60000)	// Synchronize. Wait until encoded frame is ready
-#define SURFACE_IN_USE 0
+#define INDEX_OF_RESERVED_IN_USE 0
+
 
 #define MAX_LEN_ENC_INFO (1024)
 
@@ -85,6 +86,8 @@ typedef struct intel_enc_ctx
 
 	bool				thread_exit;
 	bool				is_stop_input;	// 
+
+
 
 	// info
 	uint32_t			num_frames;
@@ -139,6 +142,7 @@ bool intel_enc_need_more_data(intel_enc_ctx *ctx);
  *	@param:	len : YUV frame data len
  */
 int intel_enc_input_yuv_frame(uint8_t *yuv, int len, intel_enc_ctx *ctx);
+int intel_enc_input_yuv_yuv420(uint8_t *yuv, int len, intel_enc_ctx *ctx);
 
 /**
  *	@desc:	user can get bitstream from encode
@@ -147,7 +151,7 @@ int intel_enc_input_yuv_frame(uint8_t *yuv, int len, intel_enc_ctx *ctx);
  *
  *	@return:	0 - successful, < 0 else failed.
  */
-int intel_enc_output_bitstream(uint8_t *out_buf, int *out_len, intel_enc_ctx *ctx);
+int intel_enc_output_bitstream(uint8_t *out_buf, int *out_len, int *is_keyframe, intel_enc_ctx *ctx);
 
 /**
  *	@desc:	user call this api if no more yuv frame input. after handle finish encode buffer yuv data
@@ -166,12 +170,17 @@ uint32_t enc_get_mfx_codec_id(int in_codec, intel_enc_ctx *ctx);
 
 mfxStatus enc_param_init(intel_enc_ctx *ctx);
 
+mfxStatus enc_get_spspps(intel_enc_ctx *ctx);
+
 /**************************************************************
  *	encode surfaces
  *************************************************************/
 mfxStatus enc_surfaces_init(intel_enc_ctx *ctx);
 void enc_surfaces_deinit(intel_enc_ctx *ctx);
 int enc_get_free_surface_index(intel_enc_ctx *ctx);
+void enc_surface_enquue_mark(mfxFrameSurface1 *surface);
+void enc_surface_dequeue_mark(mfxFrameSurface1 *surface);
+
 int enc_push_yuv_surface(mfxFrameSurface1 *surf, intel_enc_ctx *ctx);
 mfxFrameSurface1 *enc_pop_yuv_surface(intel_enc_ctx *ctx);
 

@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 	int yuv_len = 0;
 	int is_eof = 0;
 
-	while (!jm_intel_dec_is_exit(dec_handle) && !is_user_exit()) {
+	while (!jm_intel_dec_is_exit(dec_handle)) {
 		if (jm_intel_dec_need_more_data(dec_handle) && 0 == is_eof) {
 			remaining_len = jm_intel_dec_free_buf_len(dec_handle);
 			read_len = fread(in_buf, 1, remaining_len, ifile);
@@ -95,7 +95,10 @@ int main(int argc, char **argv)
 			//write_len = fwrite(out_buf, 1, yuv_len, ofile);
 		}
 
-
+		if (is_user_exit()) {
+			is_eof = 1;
+			jm_intel_dec_set_eof(1, dec_handle);
+		}
 	}
 
 

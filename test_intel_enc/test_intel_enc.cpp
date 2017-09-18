@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 	ofile = fopen("F:\\test_intel_enc.h264", "wb");
 
 	int width = 1920;
-	int height = 960;
+	int height = 1080;
 
 	//bool is_hw_support = jm_intel_is_hw_support();
 
@@ -78,8 +78,9 @@ int main(int argc, char **argv)
 	int yuv_len = width * height * 3 / 2;
 	int bs_len = 0;
 	int is_eof = 0;
+	int is_keyframe = 0;
 
-	while (!is_user_exit() && !jm_intel_enc_is_exit(enc_handle)) {
+	while (!jm_intel_enc_is_exit(enc_handle)) {
 		if (0 == is_eof) {
 			if (jm_intel_enc_more_data(enc_handle)) {
 				read_len = fread(in_buf, 1, yuv_len, ifile);
@@ -96,11 +97,16 @@ int main(int argc, char **argv)
 		}
 
 		bs_len = out_len;
-		ret = jm_intel_enc_output_bitstream(out_buf, &bs_len, enc_handle);
+		ret = jm_intel_enc_output_bitstream(out_buf, &bs_len, &is_keyframe, enc_handle);
 		if (0 == ret/* && yuv_len > 0*/) {
 			write_len = fwrite(out_buf, 1, bs_len, ofile);
 		}
 
+		if (is_user_exit()) {
+			is_eof = 1;
+			jm_intel_enc_set_eof(enc_handle);
+
+		}
 	}
 
 	printf(jm_intel_enc_info(enc_handle));

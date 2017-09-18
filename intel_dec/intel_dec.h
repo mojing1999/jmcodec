@@ -42,6 +42,7 @@ enum
 typedef struct _intel_ctx
 {
 	//
+	int				reserve[16];
 	mfxBitstream	*in_bs;
 	HANDLE 			mutex_input;
 
@@ -88,7 +89,7 @@ int intel_dec_init(int codec_type, int out_fmt, intel_ctx *ctx);
 int intel_dec_deinit(intel_ctx *ctx);
 
 //
-int intel_dec_put_input_data(uint8_t *data, int len, intel_ctx *ctx);
+int intel_dec_put_input_data(const uint8_t *data, const int len, intel_ctx *ctx);
 int intel_dec_output_yuv_frame(uint8_t *out_buf, int *out_len, intel_ctx *ctx);
 
 //
