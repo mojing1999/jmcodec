@@ -1,17 +1,13 @@
-/******************************************************************************
-*           PISOFTTECH CORPORATION PROPRIETARY INFORMATION
-*  This software is supplied under the terms of a license agreement or
-*  nondisclosure agreement with pi soft tech Corporation and may not be copied
-*  or disclosed except in accordance with the terms of that agreement.
-*    Copyright (c) 2010-2016 pi soft tech Corporation. All Rights Reserved.
+/*****************************************************************************
+*  Copyright (C) 2014 - 2017, Justin Mo.
+*  All rights reserverd.
 *
-*	This is file is part of pimedia, for nvidia device video encode
-*
-*	Author:		Justin Mo
-*	Email:		justin.mo@pisofttech.com
-*	Data:		2016-11-24
-*	Version:	V3.14
-******************************************************************************/
+*  FileName:  nv_enc.cpp
+*  Author:     Justin Mo(mojing1999@gmail.com)
+*  Date:        2017-05-08
+*  Version:    V0.01
+*  Desc:       This file implement NVIDIA VIDEO ENCODE(NVENC) INTERFACE
+*****************************************************************************/
 
 #include <stdio.h>
 #include <tchar.h>
@@ -23,7 +19,11 @@
 using namespace std;
 
 //#define  LOG printf
-#define  LOG(...)
+#ifdef _DEBUG
+#define LOG( ... )				printf( __VA_ARGS__ )
+#else
+#define LOG( ... )              
+#endif
 
 nvenc_ctx *nvenc_ctx_create()
 {
@@ -1326,32 +1326,32 @@ int nvenc_cuda_memory_release_host(void *buf, nvenc_ctx *ctx)
 			NV Encode export
  *********************************************************************************************/
 
-PISOFTDLL_FUNC handle_nvenc pisoft_nvenc_create_handle()
+JMDLL_FUNC handle_nvenc jm_nvenc_create_handle()
 {
 	return nvenc_ctx_create();
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_init(nv_enc_param *in_param, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_init(nv_enc_param *in_param, handle_nvenc handle)
 {
 	return nvenc_encode_init(in_param, (nvenc_ctx *)handle);
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_deinit(handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_deinit(handle_nvenc handle)
 {
 	return nvenc_encode_deinit((nvenc_ctx *)handle);
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_enc_frame(const unsigned char *in_yuv_buf, const int yuv_len, int *got_packet, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_enc_frame(const unsigned char *in_yuv_buf, const int yuv_len, int *got_packet, handle_nvenc handle)
 {
 	return nvenc_encode_enc_frame(in_yuv_buf, yuv_len, got_packet, (nvenc_ctx*)handle);
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_get_bitstream(unsigned char *out_buf, int *out_data_len, int *is_keyframe, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_get_bitstream(unsigned char *out_buf, int *out_data_len, int *is_keyframe, handle_nvenc handle)
 {
 	return nvenc_get_output_bitstream(out_buf, out_data_len, is_keyframe, (nvenc_ctx *)handle);
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_get_spspps_len(int *sps_len, int *pps_len, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_get_spspps_len(int *sps_len, int *pps_len, handle_nvenc handle)
 {
 	nvenc_ctx *ctx = (nvenc_ctx *)handle;
 
@@ -1360,7 +1360,7 @@ PISOFTDLL_FUNC int pisoft_nvenc_get_spspps_len(int *sps_len, int *pps_len, handl
 	return 0;
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_get_spspps(unsigned char *out_buf, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_get_spspps(unsigned char *out_buf, handle_nvenc handle)
 {
 	nvenc_ctx *ctx = (nvenc_ctx *)handle;
 
@@ -1369,12 +1369,12 @@ PISOFTDLL_FUNC int pisoft_nvenc_get_spspps(unsigned char *out_buf, handle_nvenc 
 	return 0;
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_memory_alloc_host(void **buf, int buf_len, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_memory_alloc_host(void **buf, int buf_len, handle_nvenc handle)
 {
 	return nvenc_cuda_memory_alloc_host(buf, buf_len, (nvenc_ctx *)handle);
 }
 
-PISOFTDLL_FUNC int pisoft_nvenc_memory_release_host(void *buf, handle_nvenc handle)
+JMDLL_FUNC int jm_nvenc_memory_release_host(void *buf, handle_nvenc handle)
 {
 	return nvenc_cuda_memory_release_host(buf, (nvenc_ctx *)handle);
 }

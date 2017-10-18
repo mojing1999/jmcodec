@@ -4,16 +4,16 @@
 *
 *  FileName:  nv_dec.h
 *  Author:     Justin Mo(mojing1999@gmail.com)
-*  Date:        2017-05-08
+*  Date:        2017-10-13
 *  Version:    V0.01
-*  Desc:       This file implement NVIDIA VIDEO DECODER(NVDEC) INTERFACE
+*  Desc:       This file implement NVIDIA VIDEO ENCODE(NVENC) INTERFACE
 *****************************************************************************/
 #ifndef _NV_ENCODER_H_
 #define _NV_ENCODER_H_
 #include <Windows.h>
 #include <list>
 
-#include "pisoft_nv_enc.h"
+#include "jmnv_enc.h"
 
 #include "dynlink_cuda.h"
 #include "dynlink_builtin_types.h"

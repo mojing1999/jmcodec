@@ -23,7 +23,7 @@
     <ClInclude Include="..\..\..\nv_enc\nv_enc.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\nv_enc\pisoft_nv_enc.h">
+    <ClInclude Include="..\..\..\nv_enc\jmnv_enc.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

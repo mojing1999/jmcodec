@@ -149,8 +149,8 @@
     <ClCompile Include="..\..\..\nv_enc\nv_enc.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\nv_enc\jmnv_enc.h" />
     <ClInclude Include="..\..\..\nv_enc\nv_enc.h" />
-    <ClInclude Include="..\..\..\nv_enc\pisoft_nv_enc.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
