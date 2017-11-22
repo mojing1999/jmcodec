@@ -2,7 +2,7 @@
 
 
 ## 1. 介绍
-video_codec 是Justin开源的多媒体编解码硬件加速项目([Github](https://github.com/mojing1999/video_codec))。 支持Intel集显和Nvidia显卡硬件加速。包含以下模块。仅供个人学习使用，商业使用请联系作者(Justin's Email: mojing1999@gmail.com)
+video_codec 是Justin开源的多媒体编解码硬件加速项目([Github](https://github.com/mojing1999/video_codec))。 支持Intel集显和Nvidia显卡硬件加速。包含以下模块。欢迎加入群讨论（QQ群：519072404）。仅供个人学习使用，商业使用请联系作者(Justin's Email: mojing1999@hotmail.com)
 
 #### 1). 封装Intel Media SDK，实现使用Intel集显处理多媒体编解码硬件加速。
 	
