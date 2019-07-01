@@ -83,7 +83,7 @@ jm_intel_dec_deinit()
 
 流程图
 
-![intel_dec](http://www.justinmo.video/media/intel_dec_flow.png)
+![intel_dec](http://mojing1999.github.io/media/intel_dec_flow.png)
 
 
 
@@ -132,7 +132,7 @@ jm_nvdec_deinit()
 
 流程图
 
-![nv_dec](http://www.justinmo.video/media/nv_dec_flow.png)
+![nv_dec](http://mojing1999.github.io/media/nv_dec_flow.png)
 	 
 ---
 
@@ -159,13 +159,13 @@ jm_nvdec_deinit()
 - test_intel_dec
 
 
-![intel dec](http://www.justinmo.video/media/test_intel_dec.png)
+![intel dec](http://mojing1999.github.io/media/test_intel_dec.png)
 
 
 - test_nv_dec
 
 
-![nv dec](http://www.justinmo.video/media/test_nv_dec.png)
+![nv dec](http://mojing1999.github.io/media/test_nv_dec.png)
 
 
 
